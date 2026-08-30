@@ -140,6 +140,14 @@ exports.handleMove = function (data, state, playerIndex) {
       if (!info.win) return 'mj_not_winning';
       state.winner = playerIndex;
       state.winInfo = { type: info.type, from: -1, fan: core.countFan(state.hands[playerIndex], state.melds[playerIndex], info, CANTONESE) };
+      // 买码：胡牌后从牌尾买牌加分
+      var buyResult = buyTiles(state, playerIndex);
+      if (buyResult.bonusFan > 0) {
+        state.winInfo.fan += buyResult.bonusFan;
+        state.winInfo.buyDetails = buyResult.details;
+      }
+      state.winInfo.buyTiles = buyResult.tiles;
+      state.winInfo.buyFan = buyResult.bonusFan;
       state.phase = 'over';
       return null;
     }
@@ -246,6 +254,14 @@ function resolveClaims(state) {
     const info = core.huCheck(test, state.melds[p], CANTONESE);
     state.winner = p;
     state.winInfo = { type: info.type, from: claim.discarder, fan: core.countFan(test, state.melds[p], info, CANTONESE) };
+    // 买码：胡牌后从牌尾买牌加分
+    var buyResult = buyTiles(state, p);
+    if (buyResult.bonusFan > 0) {
+      state.winInfo.fan += buyResult.bonusFan;
+      state.winInfo.buyDetails = buyResult.details;
+    }
+    state.winInfo.buyTiles = buyResult.tiles;
+    state.winInfo.buyFan = buyResult.bonusFan;
     state.phase = 'over';
     return;
   }
@@ -297,6 +313,24 @@ function resolveClaims(state) {
   state.phase = 'play';
 }
 
+// 买码：胡牌后从牌尾买牌加分（花牌/字牌每张 +1 番）
+function buyTiles(state, winnerIndex) {
+  if (!state.wall || state.wall.length === 0) return { tiles: [], bonusFan: 0, details: [] };
+  var count = Math.min(4, state.wall.length); // 买 4 张
+  var bought = [];
+  var bonusFan = 0;
+  var details = [];
+  for (var i = 0; i < count; i++) {
+    var tile = state.wall.pop();
+    bought.push(tile);
+    if (tile.k === 'feng' || tile.k === 'jian') {
+      bonusFan += 1;
+      details.push((tile.k === 'feng' ? '风' : '箭') + '花 +1');
+    }
+  }
+  return { tiles: bought, bonusFan: bonusFan, details: details };
+}
+
 // currentActor for bot scheduling: during claim, it's the current responder.
 exports.getCurrentActor = function (state) {
   if (state.phase === 'claim' && state.claim) {
@@ -312,6 +346,8 @@ exports.playerView = function (state, playerIndex) {
     dealer: state.dealer,
     winner: state.winner,
     winInfo: state.winInfo,
+    buyTiles: state.winInfo && state.winInfo.buyTiles ? state.winInfo.buyTiles.map(t => ({ k: t.k, n: t.n, id: t.id })) : null,
+    buyFan: state.winInfo ? state.winInfo.buyFan || 0 : 0,
     hasDrawn: state.hasDrawn,
     // own hand: full tiles; others: count only
     hands: state.hands.map((h, i) => {

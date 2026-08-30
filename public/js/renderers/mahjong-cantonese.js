@@ -287,8 +287,23 @@
   }
 
   function drawStatus() {
-    if (_state.winner !== null && _state.winner !== undefined) return;
     var s = _state;
+    if (s.winner !== null && s.winner !== undefined && s.winInfo) {
+      // 胡牌后显示买码结果
+      var buyMsg = '';
+      if (s.winInfo.buyTiles && s.winInfo.buyTiles.length > 0) {
+        buyMsg = ' 买码: ' + s.winInfo.buyTiles.length + '张';
+        if (s.winInfo.buyDetails && s.winInfo.buyDetails.length > 0) {
+          buyMsg += ' (' + s.winInfo.buyDetails.join(', ') + ')';
+        }
+      }
+      var msg = '玩家' + (s.winner + 1) + ' 胡牌' + buyMsg + ' ' + (s.winInfo.fan || 0) + '番';
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(msg, W / 2, H / 2 + 120);
+      return;
+    }
     var msg = '';
     if (s.phase === 'play') {
       msg = (s.currentPlayer === _playerIndex) ? '轮到你出牌' : (playerName(s.currentPlayer) + ' 出牌中');

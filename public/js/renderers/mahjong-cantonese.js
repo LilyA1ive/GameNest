@@ -162,10 +162,10 @@
     ctx.closePath();
   }
 
-  // seat position for player p relative to viewing _playerIndex
+  // seat position for player p relative to viewing _playerIndex (逆时针)
   function seatPos(p, n) {
     var offset = (p - _playerIndex + n) % n;
-    return offset; // 0=self(bottom),1=right,2=top,3=left
+    return offset; // 0=self(bottom),1=left,2=top,3=right
   }
 
   function drawHand(p, where) {
@@ -208,14 +208,14 @@
         ctx.font = '13px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(playerName(p) + ' (' + count + '张)', W / 2, 18 + smallH + 16);
-      } else if (pos === 1) { // right, vertical
-        var rh = count * (smallH + 2);
-        var sy3 = (H - rh) / 2;
-        for (var k = 0; k < count; k++) tileBack(W - smallW - 16, sy3 + k * (smallH + 2), smallW, smallH);
-      } else if (pos === 3) { // left, vertical
+      } else if (pos === 1) { // left, vertical (逆时针下一家)
         var lh = count * (smallH + 2);
         var sy4 = (H - lh) / 2;
         for (var l = 0; l < count; l++) tileBack(16, sy4 + l * (smallH + 2), smallW, smallH);
+      } else if (pos === 3) { // right, vertical
+        var rh = count * (smallH + 2);
+        var sy3 = (H - rh) / 2;
+        for (var k = 0; k < count; k++) tileBack(W - smallW - 16, sy3 + k * (smallH + 2), smallW, smallH);
       }
     }
   }

@@ -302,17 +302,17 @@
     ctx.restore();
   }
 
-  // ---- 座位映射：以自己为基准的相对位置 ----
-  // rel=0 自己(下), rel=1 对家(上), rel=2 右家(右), rel=3 左家(左)
-  // (4 人桌) 逆时针：下→右→上→左；这里 1 画上方、2 画右方、3 画左方
+  // ---- 座位映射：以自己为基准，逆时针排列（真实麻将顺序）----
+  // rel=0 自己(下), rel=1 左家(左), rel=2 对家(上), rel=3 右家(右)
+  // 出牌顺序：自己(下) → 左家(左) → 对家(上) → 右家(右) → 自己...（逆时针）
 
   function seatPos(idx) {
     var n = _state.hands.length;
     var rel = (idx - _playerIndex + n) % n;
     if (rel === 0) return 'bottom';
-    if (rel === 1) return 'top';
-    if (rel === 2) return 'right';
-    return 'left';
+    if (rel === 1) return 'left';
+    if (rel === 2) return 'top';
+    return 'right';
   }
 
   function handCount(idx) {
@@ -380,7 +380,19 @@
         var x0 = (W - totalW) / 2;
         var y0 = 30;
         for (var i = 0; i < count; i++) drawTileBack(x0 + i * (tw + gap), y0, tw, th);
-      } else if (pos === 'right') {
+      } else if (pos === 'left') {
+        // 左家：打横、垂直向下（2列多行，靠左对齐）
+        var rowsL = Math.ceil(count / sideCols);
+        var rowHL = th + gap;
+        var gridHL = rowsL * rowHL;
+        var startYL = (H - gridHL) / 2;
+        var startXL = 20;
+        for (var k = 0; k < count; k++) {
+          var rowL = Math.floor(k / sideCols);
+          var colL = k % sideCols;
+          drawTileBack(startXL + colL * (tw + gap), startYL + rowL * rowHL, tw, th);
+        }
+      } else {
         // 右家：打横、垂直向下（2列多行，靠右对齐）
         var rows = Math.ceil(count / sideCols);
         var rowH = th + gap;
@@ -392,18 +404,6 @@
           var row = Math.floor(j / sideCols);
           var col = j % sideCols;
           drawTileBack(startX + col * (tw + gap), startY + row * rowH, tw, th);
-        }
-      } else {
-        // 左家：打横、垂直向下（2列多行，靠左对齐）
-        var rowsL = Math.ceil(count / sideCols);
-        var rowHL = th + gap;
-        var gridHL = rowsL * rowHL;
-        var startYL = (H - gridHL) / 2;
-        var startXL = 20;
-        for (var k = 0; k < count; k++) {
-          var rowL = Math.floor(k / sideCols);
-          var colL = k % sideCols;
-          drawTileBack(startXL + colL * (tw + gap), startYL + rowL * rowHL, tw, th);
         }
       }
     }
@@ -628,8 +628,8 @@
       var ex, ey;
       if (pos === 'bottom') { ex = W / 2; ey = H - TH - 50 - riseY; }
       else if (pos === 'top') { ex = W / 2; ey = 30 + Math.round(TH * 0.5) + 20 + riseY; }
-      else if (pos === 'right') { ex = W - 80; ey = H / 2 - riseY; }
-      else { ex = 80; ey = H / 2 - riseY; }
+      else if (pos === 'left') { ex = 80; ey = H / 2 - riseY; }
+      else { ex = W - 80; ey = H / 2 - riseY; }
       var col = CLAIM_COLORS[e.type] || CLAIM_COLORS.pung;
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -675,15 +675,7 @@
       bx = W / 2 - 14 * (TW + 4) / 2; by = H - TH - 22; bw = 14 * (TW + 4); bh = TH + 8;
     } else if (pos === 'top') {
       bx = W / 2 - 14 * (Math.round(TW * 0.5) + 2) / 2; by = 26; bw = 14 * (Math.round(TW * 0.5) + 2); bh = Math.round(TH * 0.5) + 8;
-    } else if (pos === 'right') {
-      var rCount = handCount(cp);
-      var rRows = Math.ceil(rCount / 2);
-      var rTileH = rRows * (Math.round(TH * 0.5) + 2);
-      bx = W - 20 - 2 * (Math.round(TW * 0.5) + 2) - pad;
-      by = (H - rTileH) / 2 - pad;
-      bw = 2 * (Math.round(TW * 0.5) + 2) + pad * 2;
-      bh = rTileH + pad * 2;
-    } else {
+    } else if (pos === 'left') {
       var lCount = handCount(cp);
       var lRows = Math.ceil(lCount / 2);
       var lTileH = lRows * (Math.round(TH * 0.5) + 2);
@@ -691,6 +683,14 @@
       by = (H - lTileH) / 2 - pad;
       bw = 2 * (Math.round(TW * 0.5) + 2) + pad * 2;
       bh = lTileH + pad * 2;
+    } else {
+      var rCount = handCount(cp);
+      var rRows = Math.ceil(rCount / 2);
+      var rTileH = rRows * (Math.round(TH * 0.5) + 2);
+      bx = W - 20 - 2 * (Math.round(TW * 0.5) + 2) - pad;
+      by = (H - rTileH) / 2 - pad;
+      bw = 2 * (Math.round(TW * 0.5) + 2) + pad * 2;
+      bh = rTileH + pad * 2;
     }
     ctx.save();
     ctx.strokeStyle = 'rgba(255,200,' + Math.round(60 + 100 * glow) + ',' + (0.6 + 0.4 * glow) + ')';
@@ -729,20 +729,20 @@
         // 对家：名字在顶部中央、牌背上方
         nx = W / 2;
         ny = 10;
-      } else if (pos === 'right') {
-        // 右家：名字在牌背左侧（靠中央）
-        var rTileRows = Math.ceil(count / 2);
-        var rTileH = rTileRows * (Math.round(TH * 0.5) + 2);
-        var rTileTop = (H - rTileH) / 2;
-        nx = W - 20 - 2 * (Math.round(TW * 0.5) + 2) - bw / 2 - 6;
-        ny = rTileTop - bh / 2 - 4;
-      } else {
+      } else if (pos === 'left') {
         // 左家：名字在牌背右侧（靠中央）
         var lTileRows = Math.ceil(count / 2);
         var lTileH = lTileRows * (Math.round(TH * 0.5) + 2);
         var lTileTop = (H - lTileH) / 2;
         nx = 20 + 2 * (Math.round(TW * 0.5) + 2) + bw / 2 + 6;
         ny = lTileTop - bh / 2 - 4;
+      } else {
+        // 右家：名字在牌背左侧（靠中央）
+        var rTileRows = Math.ceil(count / 2);
+        var rTileH = rTileRows * (Math.round(TH * 0.5) + 2);
+        var rTileTop = (H - rTileH) / 2;
+        nx = W - 20 - 2 * (Math.round(TW * 0.5) + 2) - bw / 2 - 6;
+        ny = rTileTop - bh / 2 - 4;
       }
       ctx.save();
       if (isWinner) ctx.fillStyle = 'rgba(224,80,80,.9)';

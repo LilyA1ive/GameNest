@@ -14,6 +14,12 @@
   var HONOUR = { 'feng': ['', '东', '南', '西', '北'], 'jian': ['', '中', '发', '白'] };
   var SUIT_GLYPH = { wan: '万', tong: '筒', tiao: '条' };
 
+  // i18n helper (mirrors mahjong.js renderer: _t(key) with hardcoded fallback).
+  function t(key, fallback) {
+    var v = window._t ? window._t(key) : key;
+    return v === key ? fallback : v;
+  }
+
   var STYLES =
     '.mj-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}' +
     '.mj-claim{display:flex;gap:8px;pointer-events:auto;}' +
@@ -118,7 +124,7 @@
     ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('余牌: ' + count, W / 2, H / 2 + 70);
+    ctx.fillText(t('mj_wall_left', '余牌: ') + count, W / 2, H / 2 + 70);
     ctx.restore();
   }
 
@@ -212,7 +218,7 @@
       ctx.fillStyle = 'rgba(255,255,255,.7)';
       ctx.font = '13px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('你 (点击手牌出牌)', W / 2, sy - 8);
+      ctx.fillText(t('mj_you_click_discard', '你 (点击手牌出牌)'), W / 2, sy - 8);
     } else {
       // tile backs
       var smallW = tw * 0.8, smallH = th * 0.8;
@@ -223,7 +229,7 @@
         ctx.fillStyle = 'rgba(255,255,255,.7)';
         ctx.font = '13px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(playerName(p) + ' (' + count + '张)', W / 2, 18 + smallH + 16);
+        ctx.fillText(playerName(p) + ' (' + count + t('mj_tiles', '张') + ')', W / 2, 18 + smallH + 16);
       } else if (pos === 1) { // left, vertical (逆时针下一家)
         var lh = count * (smallH + 2);
         var sy4 = (H - lh) / 2;
@@ -304,12 +310,13 @@
       // 胡牌后显示买码结果
       var buyMsg = '';
       if (s.winInfo.buyTiles && s.winInfo.buyTiles.length > 0) {
-        buyMsg = ' 买码: ' + s.winInfo.buyTiles.length + '张';
+        buyMsg = ' ' + t('mj_buy_prefix', '买码: ') + s.winInfo.buyTiles.length + t('mj_tiles', '张');
         if (s.winInfo.buyDetails && s.winInfo.buyDetails.length > 0) {
-          buyMsg += ' (' + s.winInfo.buyDetails.join(', ') + ')';
+          var translated = s.winInfo.buyDetails.map(function(d) { return t(d, d); });
+          buyMsg += ' (' + translated.join(', ') + ')';
         }
       }
-      var msg = '玩家' + (s.winner + 1) + ' 胡牌' + buyMsg + ' ' + (s.winInfo.fan || 0) + '番';
+      var msg = t('mj_player', '玩家') + (s.winner + 1) + ' ' + t('mj_win', '胡') + buyMsg + ' ' + (s.winInfo.fan || 0) + t('mj_fan_unit', '番');
       ctx.fillStyle = 'rgba(0,0,0,.5)';
       ctx.font = 'bold 16px sans-serif';
       ctx.textAlign = 'center';
@@ -318,10 +325,10 @@
     }
     var msg = '';
     if (s.phase === 'play') {
-      msg = (s.currentPlayer === _playerIndex) ? '轮到你出牌' : (playerName(s.currentPlayer) + ' 出牌中');
+      msg = (s.currentPlayer === _playerIndex) ? t('mj_your_turn_play', '轮到你出牌') : (playerName(s.currentPlayer) + t('mj_playing_suffix', ' 出牌中'));
     } else if (s.phase === 'claim') {
       var actor = s.claim.order[s.claim.idx];
-      msg = (actor === _playerIndex) ? '请选择吃碰杠或过' : (playerName(actor) + ' 正在选择');
+      msg = (actor === _playerIndex) ? t('mj_choose_action', '请选择吃碰杠或过') : (playerName(actor) + t('mj_choosing_suffix', ' 正在选择'));
     }
     ctx.fillStyle = 'rgba(0,0,0,.5)';
     ctx.font = 'bold 16px sans-serif';
@@ -331,7 +338,7 @@
     // wall count
     ctx.fillStyle = 'rgba(255,255,255,.6)';
     ctx.font = '12px sans-serif';
-    ctx.fillText('余牌: ' + (Array.isArray(s.wall) ? s.wall.length : s.wall), W / 2, H / 2 + 142);
+    ctx.fillText(t('mj_wall_left', '余牌: ') + (Array.isArray(s.wall) ? s.wall.length : s.wall), W / 2, H / 2 + 142);
   }
 
   // ---- claim buttons ----
@@ -351,16 +358,16 @@
     // compute options (mirror server logic)
     var opts = [];
     var test = hand.slice(); test.push(tile);
-    if (coreHuCheck(test)) opts.push({ action: 'win', label: '胡', cls: 'mj-btn-win' });
+    if (coreHuCheck(test)) opts.push({ action: 'win', label: t('mj_win', '胡'), cls: 'mj-btn-win' });
 
     var mc = matchInHand(hand, tile.k, tile.n);
-    if (mc >= 3) opts.push({ action: 'kong', label: '杠' });
-    if (mc >= 2) opts.push({ action: 'pung', label: '碰' });
+    if (mc >= 3) opts.push({ action: 'kong', label: t('mj_kong', '杠') });
+    if (mc >= 2) opts.push({ action: 'pung', label: t('mj_pung', '碰') });
     if (isUpstream && tile.k !== 'feng' && tile.k !== 'jian') {
       // chow possible?
-      if (canChow(hand, tile)) opts.push({ action: 'chow', label: '吃' });
+      if (canChow(hand, tile)) opts.push({ action: 'chow', label: t('mj_chow', '吃') });
     }
-    opts.push({ action: 'pass', label: '过', cls: 'mj-btn-pass' });
+    opts.push({ action: 'pass', label: t('mj_pass', '过'), cls: 'mj-btn-pass' });
 
     el.style.display = 'flex';
     el.innerHTML = '';
@@ -507,6 +514,6 @@
 
   function playerName(idx) {
     if (window.gamePlayers && window.gamePlayers[idx]) return window.gamePlayers[idx].name;
-    return '玩家' + (idx + 1);
+    return t('mj_player', '玩家') + (idx + 1);
   }
 })();

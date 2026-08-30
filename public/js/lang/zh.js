@@ -769,6 +769,7 @@
     'g2048_score': '分数',
     'g2048_best': '最高分',
     'g2048_max': '最大',
+    'g2048_time': '用时',
     'g2048_hint': '方向键 / 滑动 移动方块',
     'g2048_lock': '已锁定，等待其他玩家',
 
@@ -796,6 +797,17 @@
     'mj_hu': ' 胡!',
     'mj_score': '分',
     'mj_next_round': '下一局',
+    'mj_wall_left': '余牌: ',
+    'mj_tiles_left': '张',
+    'mj_you_click_discard': '你 (点击手牌出牌)',
+    'mj_your_turn_play': '轮到你出牌',
+    'mj_buy_prefix': '买码: ',
+    'mj_buytile_wind': '风花 +1',
+    'mj_buytile_jian': '箭花 +1',
+    'mj_fan_unit': '番',
+    'mj_playing_suffix': ' 出牌中',
+    'mj_choose_action': '请选择吃碰杠或过',
+    'mj_choosing_suffix': ' 正在选择',
 
   };
   if (!window.__ACTIVE_LANG) window.__ACTIVE_LANG = 'zh';

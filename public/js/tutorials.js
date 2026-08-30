@@ -20,6 +20,7 @@
       sections: [
         { h: '游戏目标', p: '同一道数独题，比拼谁先正确填满所有空格。' },
         { h: '玩法', p: '点击空格选择数字 1-9。填对才计分，填错扣一条命（共3条命）。命用完即淘汰。每局可点3次"提示"自动揭示一个空格。先填满所有空格的玩家获胜。' },
+        { h: '淘汰与平局', p: '当除一人以外的所有玩家都被淘汰时，剩下的那玩家直接获胜（无需填满）。如果所有玩家同时被淘汰，则判定为平局。' },
         { h: '策略', p: '从数字出现最多的行/列/宫入手，逐步缩小范围。' },
       ]
     },
@@ -27,6 +28,7 @@
       sections: [
         { h: '游戏目标', p: '同一起点，比拼谁先合成 2048。' },
         { h: '玩法', p: '滑动方向键，相同数字合并为和。每次有效滑动后随机出现新数字（2 或 4）。先合成 2048 的玩家获胜。' },
+        { h: '全部锁定', p: '如果所有玩家都锁定了（无法移动）且无人合成 2048，则分数最高者获胜；分数相同则平局。' },
         { h: '策略', p: '把最大数字固定在角落，避免满盘后无法移动。' },
       ]
     },
@@ -165,8 +167,8 @@
         { h: '怎么碰牌', p: '别人打出的牌，你手里有2张相同 → 可以碰。碰后组成3张刻子亮在面前，然后立即出牌。碰对所有花色有效（包括字牌）。' },
         { h: '怎么杠牌', p: '暗杠：自己摸到4张相同；明杠：手里有3张别人打出第4张；补杠：碰后摸到第4张。杠后从牌尾补一张。杠上开花+1番。' },
         { h: '怎么胡牌', p: '自摸或点炮。胡牌公式：4组面子+1对将。七对也可胡。' },
-        { h: '番种', p: '平胡1番、自摸+1、混一色+2、对对和+2、清一色+8、字一色+8、三元（中发白）+8、三暗刻+8、天胡+8、地胡+8。' },
-        { h: '买码', p: '胡牌后自动从牌尾买4张牌。买中的花牌（春夏秋冬/梅兰竹菊）和字牌（中发白/东南西北）每张额外+1番。买码在胡牌后自动进行。' },
+        { h: '番种', p: '平胡1番起算、自摸+1、混一色+2、对对和+2、清一色+8。' },
+        { h: '买码', p: '胡牌后自动从牌尾买4张牌。买中的字牌（风牌：东南西北；箭牌：中发白）每张额外+1番。买码在胡牌后自动进行。' },
         { h: '获胜策略', p: '鸡平胡节奏快，优先听牌；注意保留中张（4-6），边张（1/9）难组搭；观察对手吃碰判断其牌型；有胡就胡，不要贪大番。' },
       ]
     },
@@ -327,9 +329,9 @@
       sections: [
         { h: '游戏目标', p: '身份局，主公与反贼两大阵营对决。反贼除掉主公即胜，忠臣护主、内奸控场，主公清剿反贼。' },
         { h: '身份分配', p: '看主公身份牌亮出后，其余玩家各拿一张暗置身份牌。通常按玩家人数配：主公1、忠臣、反贼、内奸。' },
-        { h: '基础牌', p: '「杀」用于攻击，「闪」用于躲避「杀」，「桃」回复体力。装备牌提供武器/防具/坐骑加成。锦囊牌一次性生效。' },
-        { h: '回合流程', p: '回合内依次：判定 → 摸牌 → 出牌 → 弃牌，然后交给下家。出牌阶段可出任意数量的杀（有连弩限制）。' },
-        { h: '胜负判定', p: '主公死亡：反贼胜（若只剩内奸则内奸胜）。反贼全灭：忠臣内奸需继续，直到主公阵营胜或内奸胜。' },
+        { h: '基础牌', p: '「杀」用于攻击，「闪」用于躲避「杀」，「桃」回复体力。装备牌提供武器/防具加成。锦囊牌一次性生效。' },
+        { h: '回合流程', p: '回合内依次：摸牌 → 出牌 → 弃牌，然后交给下家。出牌阶段可出任意数量的杀（装备诸葛连弩可无限出杀，否则每回合限1张）。' },
+        { h: '胜负判定', p: '反贼除掉主公即胜——但如果死亡后战场上只剩内奸一人，则内奸单独获胜。反贼全灭且内奸也阵亡，则主公与忠臣获胜。内奸必须存活到最后、成为唯一幸存者才能获胜。' },
         { h: '小贴士', p: '注意隐藏身份，谨慎出杀；内奸要平衡各方，最后再单挑主公。' },
       ]
     },
@@ -354,6 +356,7 @@
       sections: [
         { h: 'Objective', p: 'Same puzzle — race to fill all blanks correctly.' },
         { h: 'Gameplay', p: 'Click a blank cell and pick a number 1-9. Correct fills count; wrong guesses cost 1 of 3 lives. Run out and you\'re eliminated. Tap "Hint" up to 3 times to auto-reveal a cell. First to complete wins.' },
+        { h: 'Elimination & Draw', p: 'When all but one player are eliminated, the last player standing wins even without completing the grid. If all players are eliminated simultaneously, the result is a draw.' },
         { h: 'Strategy', p: 'Start with rows/columns/boxes that have the most numbers filled in.' },
       ]
     },
@@ -361,6 +364,7 @@
       sections: [
         { h: 'Objective', p: 'Same starting board — race to reach 2048.' },
         { h: 'Gameplay', p: 'Swipe to slide tiles. Equal numbers merge into their sum. A new tile (2 or 4) appears after each valid move. First to make 2048 wins.' },
+        { h: 'All Locked', p: 'If every player is locked (cannot move) and no one reached 2048, the highest score wins. A tie yields a draw.' },
         { h: 'Strategy', p: 'Keep your biggest tile in a corner to avoid getting stuck.' },
       ]
     },
@@ -498,8 +502,8 @@
         { h: 'How to Pung', p: 'Discard matches a pair in your hand → Pung to make triplet. Must discard immediately. Works for all tiles including honours.' },
         { h: 'How to Kong', p: 'Concealed: draw all 4. Exposed: have 3, opponent discards 4th. Added: pung then draw 4th. Draw replacement from wall. 杠上花 (win on replacement) +1 fan.' },
         { h: 'How to Win', p: 'Self-draw or claim discard. Formula: 4 melds + 1 pair. Seven Pairs also wins.' },
-        { h: 'Fan Types', p: '平胡 1 fan, 自摸 +1, 混一色 +2, 对对和 +2, 清一色 +8, 字一色 +8, 三元 +8, 三暗刻 +8, 天胡 +8, 地胡 +8.' },
-        { h: 'Buy Tiles (买码)', p: 'After winning, automatically buy 4 tiles from wall tail. Each flower (春夏秋冬/梅兰竹菊) or honour (中发白/东南西北) tile hit = +1 fan bonus.' },
+        { h: 'Fan Types', p: '平胡 1 fan base, 自摸 +1, 混一色 +2, 对对和 +2, 清一色 +8.' },
+        { h: 'Buy Tiles (买码)', p: 'After winning, automatically buy 4 tiles from the wall tail. Each honour tile hit — winds (东南西北) or dragons (中发白) — scores +1 fan bonus. The deck has no flower tiles.' },
         { h: 'Winning Strategy', p: 'Fast-paced — prioritize reaching ready status; keep middle tiles (4-6), edge tiles (1/9) are hard to use; watch opponents\' chows/pungs to deduce their hands; don\'t greed for big fans — win when you can.' },
       ]
     },
@@ -666,9 +670,9 @@
       sections: [
         { h: 'Objective', p: 'Identity mode — a duel between lord and rebel factions. Rebels win by slaying the lord; loyalists protect him, the traitor plays all sides, and the lord cleans up the rebels.' },
         { h: 'Roles', p: 'The Lord reveals his identity; everyone else draws a hidden role. Roles scale with player count: 1 Lord, loyalists, rebels, one traitor.' },
-        { h: 'Basic Cards', p: '「Slash」attacks, 「Dodge」blocks Slash, 「Peach」heals. Equipment cards boost weapon/armor/horse. Trick cards resolve once.' },
-        { h: 'Turn Flow', p: 'On your turn: judge → draw → play → discard, then pass. During the play phase you may use any number of Slashes (subject to the Crossbow limit).' },
-        { h: 'Winning', p: 'If the Lord dies, rebels win (unless only the traitor survives). If all rebels die, the Lord\'s side must finish the game, or the traitor wins by killing the Lord in a duel.' },
+        { h: 'Basic Cards', p: '「Slash」attacks, 「Dodge」blocks Slash, 「Peach」heals. Equipment cards boost weapon/armor. Trick cards resolve once.' },
+        { h: 'Turn Flow', p: 'On your turn: draw → play → discard, then pass. During the play phase you may play 1 Slash per turn (unlimited with the Crossbow equipped).' },
+        { h: 'Winning', p: 'Rebels win by slaying the Lord — but if the only survivor at that moment is the traitor, the traitor wins instead. If all rebels and the traitor are eliminated, the Lord and loyalists win. The traitor must be the sole survivor to claim victory.' },
         { h: 'Tip', p: 'Hide your role and slash carefully. The traitor balances the factions, then hunts the Lord at the end.' },
       ]
     },

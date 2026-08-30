@@ -27,6 +27,7 @@ exports.createState = () => ({
   _lastDiscardFrom: -1,
   _claimPending: 0,
   _variants: 'sichuan',
+  _winSelfDraw: {},
 });
 
 // Unified entry: room.game stays 'mahjong-sichuan', but the actual ruleset is
@@ -53,6 +54,7 @@ exports.initGame = function (state, playerCount) {
   state._lastDiscardFrom = -1;
   state._claimPending = 0;
   state.guessCount = new Array(playerCount).fill(0);
+  state._winSelfDraw = {};
   state.currentPlayer = 0;
 
   const hands = [];
@@ -162,13 +164,13 @@ function checkWin(state, playerIndex, extraTile) {
 
 function registerWin(state, playerIndex) {
   if (!state.winners.includes(playerIndex)) state.winners.push(playerIndex);
-  if (state.winners.length >= 3) {
-    state.phase = 'over';
-  } else if (state.deck.length === 0) {
+  if (state.winners.length >= 3 || state.deck.length === 0) {
     state.phase = 'over';
   } else {
-    // blood battle: continue. phase stays 'win' until next claim/draw.
-    state.phase = 'win';
+    // 血战到底: 继续游戏。从胡牌者下一家开始，由下一家摸牌出牌。
+    // 把 currentPlayer 设为胡牌家，advanceTurn 会跳过已胡牌的玩家。
+    state.currentPlayer = playerIndex;
+    advanceTurn(state, state.hands.length);
   }
 }
 
@@ -224,6 +226,10 @@ exports.handleMove = function (data, state, playerIndex) {
       if (!info) return 'mj_not_winning';
       // remove the claimed discard from its owner's discard pile
       removeDiscard(state, state._lastDiscardFrom, ld.id);
+      // 把胡牌张加入手牌，保证计分（清一色/七对等）基于完整14张
+      state.hands[playerIndex].push({ k: ld.k, n: ld.n, id: ld.id });
+      sortTiles(state.hands[playerIndex]);
+      state._winSelfDraw[playerIndex] = false;
       registerWin(state, playerIndex);
       return null;
     }
@@ -278,6 +284,7 @@ exports.handleMove = function (data, state, playerIndex) {
       if (!voidSatisfied(state, playerIndex)) return 'mj_void_not_satisfied';
       const info = checkWin(state, playerIndex, null);
       if (!info) return 'mj_not_winning';
+      state._winSelfDraw[playerIndex] = true;
       registerWin(state, playerIndex);
       return null;
     }
@@ -302,33 +309,8 @@ exports.handleMove = function (data, state, playerIndex) {
     return 'mj_must_discard';
   }
 
-  // ---- Win (blood battle continuation) ----
-  if (state.phase === 'win') {
-    // After a win in blood battle, play resumes with next player drawing.
-    // For simplicity, treat like play phase once a tile is drawn.
-    if (state.currentPlayer !== playerIndex) return 'g_not_your_turn';
-    if (data.type === 'win') {
-      if (!voidSatisfied(state, playerIndex)) return 'mj_void_not_satisfied';
-      const info = checkWin(state, playerIndex, null);
-      if (!info) return 'mj_not_winning';
-      registerWin(state, playerIndex);
-      return null;
-    }
-    if (data.type === 'discard') {
-      const tileId = data.tileId;
-      const idx = findTileIndex(state.hands[playerIndex], tileId);
-      if (idx < 0) return 'mj_tile_not_in_hand';
-      const tile = state.hands[playerIndex].splice(idx, 1)[0];
-      state.discards[playerIndex].push(tile);
-      state.lastDiscard = tile;
-      state._lastDiscardFrom = playerIndex;
-      state.drawn = null;
-      state.phase = 'claim';
-      state._claimPending = playerCount - 1;
-      return null;
-    }
-    return 'mj_must_discard';
-  }
+  // 血战到底在 registerWin 里已自动推进到下一家（advanceTurn → phase 'play'），
+  // 不再存在独立的 'win' 阶段。保留 cantonese 委托路径不会走到这里。
 
   if (state.phase === 'over') return 'g_game_over';
 
@@ -436,7 +418,8 @@ function calculateScore(state, winnerIndex) {
   var hand = state.hands[winnerIndex];
   var melds = state.melds[winnerIndex];
   var winInfo = core.huCheck(hand, melds, SICHUAN);
-  var isSelfDraw = (state._lastDiscardFrom !== winnerIndex);
+  // 自摸：仅在摸牌时胡牌记一分。点炮（接炮）不记自摸分。
+  var isSelfDraw = !!state._winSelfDraw[winnerIndex];
 
   var result = core.countFanDetailed(hand, melds, winInfo, SICHUAN, {
     selfDraw: isSelfDraw,

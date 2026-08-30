@@ -769,6 +769,7 @@
     'g2048_score': 'Score',
     'g2048_best': 'Best',
     'g2048_max': 'Max',
+    'g2048_time': 'Time',
     'g2048_hint': 'Arrow keys / swipe to move tiles',
     'g2048_lock': 'Locked, waiting for other players',
 
@@ -796,6 +797,17 @@
     'mj_hu': ' Win!',
     'mj_score': ' pts',
     'mj_next_round': 'Next Round',
+    'mj_wall_left': 'Tiles left: ',
+    'mj_tiles_left': ' tiles',
+    'mj_you_click_discard': 'You (tap a tile to discard)',
+    'mj_your_turn_play': 'Your turn to play',
+    'mj_buy_prefix': 'Buy tiles: ',
+    'mj_buytile_wind': 'Wind-flower +1',
+    'mj_buytile_jian': 'Dragon-flower +1',
+    'mj_fan_unit': 'fan',
+    'mj_playing_suffix': ' playing',
+    'mj_choose_action': 'Choose chow/pung/kong or pass',
+    'mj_choosing_suffix': ' choosing',
 
   };
   if (!window.__ACTIVE_LANG) window.__ACTIVE_LANG = 'en';

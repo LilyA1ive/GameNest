@@ -104,7 +104,7 @@
             if (cnt > prev && cnt > 0) {
               var md = state.melds[i][cnt - 1];
               var type = md.type;
-              var label = type === 'kong' ? '杠' : type === 'pung' ? '碰' : type === 'chow' ? '吃' : type === 'win' ? '胡' : '';
+              var label = type === 'kong' ? t('mj_kong', '杠') : type === 'pung' ? t('mj_pung', '碰') : type === 'chow' ? t('mj_chow', '吃') : type === 'win' ? t('mj_win', '胡') : '';
               if (label) {
                 _claimEffects.push({ player: i, type: type, label: label, birth: Date.now() });
                 if (_claimEffects.length > 8) _claimEffects.shift();
@@ -119,7 +119,7 @@
             var wPlayer = state.winners[w];
             var alreadyShown = _claimEffects.some(function(e){ return e.player === wPlayer && e.type === 'win'; });
             if (!alreadyShown) {
-              _claimEffects.push({ player: wPlayer, type: 'win', label: '胡!', birth: Date.now() });
+              _claimEffects.push({ player: wPlayer, type: 'win', label: t('mj_win', '胡') + '!', birth: Date.now() });
             }
           }
         }
@@ -379,7 +379,7 @@
     ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('余牌: ' + count, W / 2, H / 2 + 85);
+    ctx.fillText(t('mj_wall_left', '余牌: ') + count, W / 2, H / 2 + 85);
     ctx.restore();
   }
 
@@ -908,6 +908,14 @@
     return false;
   }
 
+  // 定缺是否已满足（手里没有缺门花色）
+  function voidSatisfied(hand) {
+    var vs = _state.voidSuit && _state.voidSuit[_playerIndex];
+    if (!vs) return true;
+    for (var i = 0; i < hand.length; i++) if (hand[i].k === vs) return false;
+    return true;
+  }
+
   // 检查是否能吃（需要手中有能与弃牌组成顺子的两张牌）
   function canChowTile(hand, tile) {
     if (tile.k === 'feng' || tile.k === 'jian') return false;
@@ -927,9 +935,9 @@
     var hand = _state.hands[_playerIndex];
     if (!Array.isArray(hand)) return claims;
     var mc = countMatching(hand, ld.k, ld.n);
-    // 胡
+    // 胡（需满足定缺：手里不能有缺门花色）
     var testHand = hand.concat([ld]);
-    if (huCheckSimple(testHand, _state.melds[_playerIndex])) claims.push('win');
+    if (huCheckSimple(testHand, _state.melds[_playerIndex]) && voidSatisfied(hand)) claims.push('win');
     // 杠（手中有 3 张）
     if (mc >= 3) claims.push('kong');
     // 碰（手中有 2 张）

@@ -176,7 +176,10 @@ test('win: self-draw winning hand registers a winner', () => {
   const res = game.handleMove({ type: 'win' }, s, 0);
   assert.equal(res, null);
   assert.ok(s.winners.includes(0), 'player 0 should be a winner');
-  assert.match(s.phase, /win|over/);
+  // 血战到底：一局未结束（仅1家胡，牌墙未空），下一家摸牌继续 → phase 回到 play
+  assert.equal(s.phase, 'play', 'blood battle continues; next player draws');
+  assert.equal(s.currentPlayer, 1, 'turn advances to next non-winner player');
+  assert.equal(s.hands[1].length, 14, 'next player drew a tile');
 });
 
 test('win: cannot win while holding void-suit tiles', () => {

@@ -139,7 +139,8 @@ exports.handleMove = function (data, state, playerIndex) {
       const info = core.huCheck(state.hands[playerIndex], state.melds[playerIndex], CANTONESE);
       if (!info.win) return 'mj_not_winning';
       state.winner = playerIndex;
-      state.winInfo = { type: info.type, from: -1, fan: core.countFan(state.hands[playerIndex], state.melds[playerIndex], info, CANTONESE) };
+      var scoreInfo = scoreHand(state.hands[playerIndex], state.melds[playerIndex], info, true, state.wall.length);
+      state.winInfo = { type: info.type, from: -1, fan: scoreInfo.fan, details: scoreInfo.details };
       // 买码：胡牌后从牌尾买牌加分
       var buyResult = buyTiles(state, playerIndex);
       if (buyResult.bonusFan > 0) {
@@ -255,7 +256,8 @@ function resolveClaims(state) {
     test.push(tile);
     const info = core.huCheck(test, state.melds[p], CANTONESE);
     state.winner = p;
-    state.winInfo = { type: info.type, from: claim.discarder, fan: core.countFan(test, state.melds[p], info, CANTONESE) };
+    var scoreInfo = scoreHand(test, state.melds[p], info, false, state.wall.length);
+    state.winInfo = { type: info.type, from: claim.discarder, fan: scoreInfo.fan, details: scoreInfo.details };
     // 买码：胡牌后从牌尾买牌加分
     var buyResult = buyTiles(state, p);
     if (buyResult.bonusFan > 0) {
@@ -321,6 +323,27 @@ function resolveClaims(state) {
   state.phase = 'play';
 }
 
+// Cantonese scoring wrapper.
+//  - core honours-mode returns 清一色 = 4, but rules (and tutorial) = 8
+//  - 平胡 = 1 is the base for a plain hand; 自摸 = +1 always stacks on top
+//  - minimum winning hand = 1 fan
+function scoreHand(hand, melds, winInfo, selfDraw, wallCount) {
+  // Compute pattern fans WITHOUT self-draw (handled separately below).
+  var result = core.countFanDetailed(hand, melds, winInfo, CANTONESE, {
+    selfDraw: false,
+    wallCount: wallCount || 0,
+  });
+  // 清一色: core honours-mode returns 4, but Cantonese rules = 8 (per tutorial)
+  for (var i = 0; i < result.details.length; i++) {
+    if (result.details[i].name === '清一色') { result.details[i].fan = 8; }
+  }
+  // Base: a plain hand with no pattern fans is 平胡 = 1
+  if (result.fan === 0) { result.details.push({ name: '平胡', fan: 1 }); result.fan = 1; }
+  // 自摸 always stacks as +1 on top of the base/pattern fans
+  if (selfDraw) { result.details.push({ name: '自摸', fan: 1 }); result.fan += 1; }
+  return result;
+}
+
 // 买码：胡牌后从牌尾买牌加分（花牌/字牌每张 +1 番）
 function buyTiles(state, winnerIndex) {
   if (!state.wall || state.wall.length === 0) return { tiles: [], bonusFan: 0, details: [] };
@@ -333,7 +356,7 @@ function buyTiles(state, winnerIndex) {
     bought.push(tile);
     if (tile.k === 'feng' || tile.k === 'jian') {
       bonusFan += 1;
-      details.push((tile.k === 'feng' ? '风' : '箭') + '花 +1');
+      details.push(tile.k === 'feng' ? 'mj_buytile_wind' : 'mj_buytile_jian');
     }
   }
   return { tiles: bought, bonusFan: bonusFan, details: details };

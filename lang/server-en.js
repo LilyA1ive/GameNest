@@ -281,4 +281,51 @@ module.exports = {
   'rv_out_of_bounds': 'Out of bounds',
   'rv_cell_occupied': 'Cell already occupied',
   'rv_illegal_move': 'Illegal move',
+
+  // 2048 (g2048_)
+  'g2048_dead': 'Locked out',
+  'g2048_bad_dir': 'Invalid direction',
+  'g2048_no_move': 'No movement',
+
+  // Sudoku (su_)
+  'su_wrong': 'Wrong answer',
+  'su_eliminated': 'You are eliminated',
+  'su_no_hints': 'No hints left',
+  'su_invalid': 'Invalid input',
+  'su_illegal_cell': 'Cannot edit a given clue',
+
+  // Mahjong common (mj_)
+  'mj_choose_void': 'Please choose the void suit',
+  'mj_void_not_satisfied': 'Cannot win: you still hold void-suit tiles',
+  'mj_not_winning': 'Not a winning hand',
+  'mj_cannot_pung': 'Cannot pung this tile',
+  'mj_cannot_kong': 'Cannot kong this tile',
+  'mj_bad_claim': 'Invalid action',
+  'mj_must_discard': 'You must discard a tile first',
+  'mj_tile_not_in_hand': 'Tile not in hand',
+  'mj_bad_void_suit': 'Invalid void suit',
+  'mj_must_draw': 'Must draw a tile first',
+  'mj_cannot_chow': 'Cannot chow this tile',
+  'mj_invalid_move': 'Invalid move',
+  'mj_invalid_claim': 'Invalid claim action',
+
+  // Sanguosha (sgs_)
+  'sgs_sha_limit': 'Only 1 Slash per turn (unlimited with Crossbow)',
+  'sgs_need_target': 'Need to select a target',
+  'sgs_target_dead': 'Target is already dead',
+  'sgs_target_self': 'Cannot target yourself',
+  'sgs_out_of_range': 'Target out of range',
+  'sgs_full_hp': 'HP already full',
+  'sgs_wine_used': 'Wine already used this turn',
+  'sgs_invalid_target': 'Invalid target',
+  'sgs_card_not_found': 'Card not in hand',
+  'sgs_unknown_card': 'Unknown card',
+  'sgs_invalid_move': 'Invalid move',
+  'sgs_seat_missing': 'Seat not found',
+  'sgs_already_chosen': 'General already chosen',
+  'sgs_invalid_general': 'Not a valid candidate general',
+  'sgs_draw_first': 'Draw first',
+  'sgs_discard_count': 'Wrong number of cards to discard',
+  'sgs_must_discard': 'Must discard down to HP first',
+  'sgs_invalid_phase': 'Not allowed in current phase',
 };

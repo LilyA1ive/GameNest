@@ -219,15 +219,15 @@
     var el = document.getElementById('suStatus');
     if (!el) return;
     if (state && state.eliminated) {
-      el.textContent = t('sudoku_dead', '你已出局');
+      el.textContent = t('sudoku_dead', 'You are out');
       el.style.color = '#e74c3c';
       return;
     }
     if (winner !== null && winner !== undefined) {
-      el.textContent = winner === -1 ? t('draw', '平局') : (winner === _playerIndex ? t('you_win', '你赢了') : t('opponent_wins', '对手获胜'));
+      el.textContent = winner === -1 ? t('draw', 'Draw') : (winner === _playerIndex ? t('you_win', 'You Win!') : t('opponent_wins', 'Opponent Wins'));
       el.style.color = winner === _playerIndex ? ACCENT : 'var(--text-muted)';
     } else if (state) {
-      el.textContent = t('sudoku_progress', '进度') + ' ' + state.doneCount + ' / ' + state.blanks;
+      el.textContent = t('sudoku_progress', 'Progress') + ' ' + state.doneCount + ' / ' + state.blanks;
       el.style.color = 'var(--text-muted)';
     }
   }
@@ -281,7 +281,7 @@
           + '<div class="su-board-wrap" id="suBoardWrap"></div>'
           + '<div class="su-controls">'
             + '<button class="su-hint" id="suHint" onclick="window._sudokuHint()">'
-              + t('sudoku_hint', '提示') + ' <span class="su-hint-badge" id="suHintBadge">×3</span>'
+              + t('sudoku_hint', 'Hint') + ' <span class="su-hint-badge" id="suHintBadge">×3</span>'
             + '</button>'
           + '</div>'
           + '<div class="su-pad" id="suPad">'
@@ -294,7 +294,7 @@
             + '<button class="su-num" data-v="7" onclick="window._sudokuFill(7)">7</button>'
             + '<button class="su-num" data-v="8" onclick="window._sudokuFill(8)">8</button>'
             + '<button class="su-num" data-v="9" onclick="window._sudokuFill(9)">9</button>'
-            + '<button class="su-num su-num-clear" onclick="window._sudokuClear()" style="grid-column:1/-1;">' + t('sudoku_clear', '清除') + '</button>'
+            + '<button class="su-num su-num-clear" onclick="window._sudokuClear()" style="grid-column:1/-1;">' + t('sudoku_clear', 'Clear') + '</button>'
           + '</div>'
         + '</div>';
 

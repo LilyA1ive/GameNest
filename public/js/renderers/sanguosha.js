@@ -28,8 +28,9 @@
   };
 
   var canvas, ctx, W, H;
-  var selectedCard = null;   // selected hand card id
+  var selectedCard = null;   // selected hand card id (play phase)
   var selectedTarget = -1;   // hovered/clicked seat index
+  var discardSel = [];       // selected hand card ids (discard phase, multi-select)
   var gameState = null;
   var selfIdx = 0;
 
@@ -77,8 +78,9 @@
       gameState = state;
       selfIdx = playerIndex;
       if (!ctx) return;
-      // Reset selection when it's no longer our turn
-      if (!isMyTurn()) { selectedCard = null; selectedTarget = -1; }
+      // Reset selection when it's no longer our turn / phase changed
+      if (!isMyTurn()) { selectedCard = null; selectedTarget = -1; discardSel = []; }
+      if (gameState.phase !== 'discard') discardSel = [];
       draw();
     },
   });
@@ -146,7 +148,14 @@
       for (var h = 0; h < hand.length; h++) {
         var cx = startX + h * (cw + 6);
         if (x >= cx && x <= cx + cw && y >= handY && y <= handY + ch) {
-          selectedCard = (selectedCard === hand[h].id) ? null : hand[h].id;
+          if (gameState.phase === 'discard') {
+            // multi-select for discard
+            var idx = discardSel.indexOf(hand[h].id);
+            if (idx === -1) discardSel.push(hand[h].id);
+            else discardSel.splice(idx, 1);
+          } else {
+            selectedCard = (selectedCard === hand[h].id) ? null : hand[h].id;
+          }
           draw();
           return;
         }
@@ -174,9 +183,17 @@
       var seat = gameState.seats[selfIdx];
       var excess = seat.hand.length - seat.hp;
       if (excess <= 0) {
+        // no discard needed — click 确定 to end turn
         var adv = endButton();
         if (adv && x >= adv.x && x <= adv.x + adv.w && y >= adv.y && y <= adv.y + adv.h) {
           window.makeGameMove({ type: 'end' });
+        }
+      } else if (discardSel.length === excess) {
+        // confirm button: send the selected cards as discard
+        var btn = { x: W / 2 - 50, y: H - cardHeight() - 16 - 50, w: 100, h: 32 };
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          window.makeGameMove({ type: 'discard', cardIds: discardSel.slice() });
+          discardSel = [];
         }
       }
     }
@@ -373,7 +390,10 @@
       var seat = gameState.seats[selfIdx];
       var excess = seat.hand.length - seat.hp;
       if (excess > 0) {
-        ctx.fillText('需弃 ' + excess + ' 张牌 (点击手牌选择)', cx, cy + 14);
+        ctx.fillText('需弃 ' + excess + ' 张牌 (已选 ' + discardSel.length + ')', cx, cy + 14);
+        if (discardSel.length === excess) {
+          drawButton({ x: W / 2 - 50, y: H - cardHeight() - 16 - 50, w: 100, h: 32 }, '确认弃牌', '#c0392b');
+        }
       } else {
         ctx.fillText('无需弃牌', cx, cy + 14);
         drawButton(endButton(), '确定', '#27ae60');
@@ -464,7 +484,8 @@
     for (var i = 0; i < hand.length; i++) {
       var cx = startX + i * (cw + 6);
       var c = hand[i];
-      var selected = (selectedCard === c.id);
+      var selected = (selectedCard === c.id) ||
+                     (gameState.phase === 'discard' && discardSel.indexOf(c.id) !== -1);
       var lift = selected ? -14 : 0;
       drawCard(cx, y + lift, cw, ch, c, selected);
     }

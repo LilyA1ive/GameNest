@@ -302,6 +302,7 @@ function playBarbarian(state, playerIndex, card, cardIdx) {
     if (i === playerIndex) continue;
     const other = state.seats[i];
     if (other.dead) continue;
+    if (state.winner) break; // game already decided; stop resolving
     const shaIdx = other.hand.findIndex(c => c.name === '杀');
     if (shaIdx !== -1) {
       const c = other.hand.splice(shaIdx, 1)[0];
@@ -320,6 +321,7 @@ function playArrows(state, playerIndex, card, cardIdx) {
     if (i === playerIndex) continue;
     const other = state.seats[i];
     if (other.dead) continue;
+    if (state.winner) break; // game already decided; stop resolving
     const shanIdx = other.hand.findIndex(c => c.name === '闪');
     if (shanIdx !== -1) {
       const c = other.hand.splice(shanIdx, 1)[0];
@@ -348,9 +350,11 @@ function checkWin(state) {
     const alive = state.seats.filter(s => !s.dead);
     if (alive.length === 1 && alive[0].role === 'traitor') {
       state.winner = 'traitor';
-    } else {
+    } else if (state.seats.some(s => s.role === 'rebel' && !s.dead)) {
       state.winner = 'rebel';
     }
+    // else: lord dead but only loyalist(s)+traitor remain and no rebel —
+    // game continues; the traitor must still be the last survivor to win.
     return state.winner;
   }
   const rebelsAlive = state.seats.some(s => s.role === 'rebel' && !s.dead);

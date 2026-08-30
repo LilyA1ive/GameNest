@@ -1,0 +1,17 @@
+# Render.com 部署配置
+# 文档: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: gamenest
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    autoDeploy: true

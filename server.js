@@ -313,6 +313,12 @@ function applyRuntimeState(room, totalPlayers) {
   s._hasBots = room.bots && room.bots.size > 0;
   s._options = { ...room.options };
   s._lang = room._lang || 'zh';
+  // Mahjong multi-round: ensure tracking fields exist (first game / fresh state)
+  if (room.game === 'mahjong-sichuan' || room.game === 'mahjong-cantonese') {
+    if (!s.cumulativeScore) s.cumulativeScore = new Array(totalPlayers).fill(0);
+    if (s.dealerIndex === undefined) s.dealerIndex = 0;
+    if (!s.roundNumber) s.roundNumber = 1;
+  }
 }
 
 function clearAllRoomTimers(room) {
@@ -324,6 +330,71 @@ function clearAllRoomTimers(room) {
     for (const h of room._tfBotTimers) clearTimeout(h);
     room._tfBotTimers = [];
   }
+}
+
+// Mahjong: resolve a winner index to a fan total. Sichuan exports calculateScore;
+// Cantonese stores the resolved fan on state.winInfo but has no calculateScore export.
+function calculateMahjongScore(state, winnerIndex) {
+  var gameMod = gameRegistry[state.game];
+  if (gameMod && gameMod.calculateScore) {
+    return gameMod.calculateScore(state, winnerIndex);
+  }
+  if (state.winInfo && typeof state.winInfo.fan === 'number') {
+    return { fan: state.winInfo.fan, details: [{ name: state.winInfo.type || '胡', fan: state.winInfo.fan }] };
+  }
+  return { fan: 1, details: [{ name: '平胡', fan: 1 }] };
+}
+
+// Mahjong multi-round: when a round ends (phase === 'over'), convert each winner's
+// fan to points, add to cumulative totals, and broadcast a round_end summary.
+// Guarded by state._roundEndBroadcast so it fires once per round.
+function endOfRound(room) {
+  var state = room.state;
+  if (!state || state._roundEndBroadcast) return;
+  if (state.phase !== 'over') return;
+  state._roundEndBroadcast = true;
+
+  var playerCount = state.hands.length;
+  var roundScores = new Array(playerCount).fill(0);
+
+  // Collect winners. Sichuan uses state.winners[] (may be empty on 荒庄),
+  // Cantonese uses state.winner (single index, -1 = 荒庄).
+  var winners = [];
+  if (state.winners && state.winners.length > 0) {
+    for (var wi = 0; wi < state.winners.length; wi++) {
+      if (state.winners[wi] >= 0) winners.push(state.winners[wi]);
+    }
+  } else if (state.winner != null && state.winner >= 0) {
+    winners.push(state.winner);
+  }
+
+  // Simplified scoring: each winner gains their fan total. No cross-player deduction
+  // for now (TODO if head-to-head payment is desired later).
+  for (var w = 0; w < winners.length; w++) {
+    var scoreInfo = calculateMahjongScore(state, winners[w]);
+    roundScores[winners[w]] = (roundScores[winners[w]] || 0) + scoreInfo.fan;
+  }
+
+  if (!state.cumulativeScore) state.cumulativeScore = new Array(playerCount).fill(0);
+  for (var i = 0; i < playerCount; i++) {
+    state.cumulativeScore[i] = (state.cumulativeScore[i] || 0) + roundScores[i];
+  }
+
+  broadcastRoom(room, {
+    type: 'round_end',
+    roundScores: roundScores,
+    cumulativeScore: state.cumulativeScore.slice(),
+    dealerIndex: state.dealerIndex,
+    roundNumber: state.roundNumber,
+    winners: winners,
+  });
+}
+
+// Detect a finished mahjong round and trigger the one-time settlement broadcast.
+function checkMahjongRoundEnd(room) {
+  if (!room || !room.state) return;
+  if (room.game !== 'mahjong-sichuan' && room.game !== 'mahjong-cantonese') return;
+  if (room.state.phase === 'over') endOfRound(room);
 }
 
 function scheduleTwentyFourBots(room) {
@@ -457,6 +528,11 @@ function scheduleBotMove(room) {
   if (!room || !room.state) return;
   const state = room.state;
   if (state.winner !== null && state.winner !== undefined) return;
+  // Mahjong: Sichuan uses phase 'over' with winner still null — stop bots and settle
+  if ((room.game === 'mahjong-sichuan' || room.game === 'mahjong-cantonese') && state.phase === 'over') {
+    endOfRound(room);
+    return;
+  }
 
   const gameMod = gameRegistry[room.game];
   if (!gameMod) return;
@@ -994,6 +1070,8 @@ wss.on('connection', (ws) => {
       broadcastGameView(currentRoom, 'game_state');
       if (currentRoom.game === 'doudizhu') scheduleTurnTimer(currentRoom);
       scheduleBotMove(currentRoom);
+      // Mahjong: settle the round once it reaches phase 'over'
+      checkMahjongRoundEnd(currentRoom);
       return;
     }
 
@@ -1022,11 +1100,46 @@ wss.on('connection', (ws) => {
       const gameMod = gameRegistry[currentRoom.game];
       if (!gameMod) return;
       const totalPlayers = currentRoom.players.size + (currentRoom.bots ? currentRoom.bots.size : 0);
+
+      // Mahjong multi-round: snapshot the previous round's tracking fields
+      // before createState() replaces the state object.
+      var prevMJ = null;
+      if (currentRoom.state && (currentRoom.game === 'mahjong-sichuan' || currentRoom.game === 'mahjong-cantonese')) {
+        prevMJ = {
+          cumulativeScore: currentRoom.state.cumulativeScore,
+          dealerIndex: currentRoom.state.dealerIndex,
+          roundNumber: currentRoom.state.roundNumber,
+          // Sichuan: state.winners[] (array, empty on 荒庄); Cantonese: state.winner (single index, -1 = 荒庄)
+          winners: currentRoom.state.winners,
+          winner: currentRoom.state.winner,
+        };
+      }
+
       currentRoom.state = gameMod.createState();
       applyRuntimeState(currentRoom, totalPlayers);
       if (gameMod && gameMod.initGame) {
         gameMod.initGame(currentRoom.state, totalPlayers);
       }
+
+      // Mahjong multi-round: restore cumulative scores and rotate the dealer.
+      if (prevMJ) {
+        currentRoom.state.cumulativeScore = prevMJ.cumulativeScore || new Array(totalPlayers).fill(0);
+        var nextDealer;
+        var hadWinner = false;
+        if (prevMJ.winners && prevMJ.winners.length > 0 && prevMJ.winners[0] >= 0) {
+          nextDealer = prevMJ.winners[0]; // 胡牌者坐庄
+          hadWinner = true;
+        } else if (prevMJ.winner != null && prevMJ.winner >= 0) {
+          nextDealer = prevMJ.winner; // Cantonese 胡牌者坐庄
+          hadWinner = true;
+        }
+        if (!hadWinner) {
+          nextDealer = ((prevMJ.dealerIndex || 0) + 1) % totalPlayers; // 荒庄顺时针轮庄
+        }
+        currentRoom.state.dealerIndex = nextDealer;
+        currentRoom.state.roundNumber = (prevMJ.roundNumber || 1) + 1;
+      }
+
       if (currentRoom.game === 'drawguess') scheduleDrawguessTimer(currentRoom);
       currentRoom.phase = 'playing';
 

@@ -6,6 +6,8 @@
   var N = 4;
   var canvas, ctx, _layout = { ox: 0, oy: 0, cell: 0, size: 0 };
   var _playerIndex = 0;
+  var _timerEnd = 0;
+  var _timerRaf = null;
   var _inited = false;
 
   // Tile background colors by value (classic 2048 palette).
@@ -37,6 +39,34 @@
 
   function tileColor(v) { return TILE_COLORS[v] || '#3c3a32'; }
   function textColor(v) { return TILE_TEXT[v] || '#f9f6f2'; }
+
+  function formatTime(ms) {
+    var totalSec = Math.floor(ms / 1000);
+    var m = Math.floor(totalSec / 60);
+    var s = totalSec % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function updateTimer(state) {
+    var el = document.getElementById('g2048Timer');
+    if (!el) return;
+    if (!state || !state.startTime) { el.textContent = '--:--'; return; }
+    var end = (state.winner !== null && state.winner !== undefined) ? _timerEnd : Date.now();
+    el.textContent = formatTime(end - state.startTime);
+  }
+  function startTimer(state) {
+    if (_timerRaf) { clearInterval(_timerRaf); _timerRaf = null; }
+    if (!state || !state.startTime) return;
+    _timerEnd = 0;
+    updateTimer(state);
+    _timerRaf = setInterval(function () {
+      var s = window._g2048State;
+      if (!s || (s.winner !== null && s.winner !== undefined)) {
+        if (_timerRaf) { clearInterval(_timerRaf); _timerRaf = null; }
+        return;
+      }
+      updateTimer(s);
+    }, 250);
+  }
 
   function computeLayout() {
     var maxBoard = Math.min(window.innerWidth - 24, 520, window.innerHeight * 0.55);
@@ -221,6 +251,7 @@
             + '<div class="g2048-stat"><div class="label">' + t('g2048_score', '分数') + '</div><div class="value" id="g2048Score">0</div></div>'
             + '<div class="g2048-stat"><div class="label">' + t('g2048_best', '最高分') + '</div><div class="value" id="g2048Best">0</div></div>'
             + '<div class="g2048-stat"><div class="label">' + t('g2048_max', '最大') + '</div><div class="value" id="g2048Max">0</div></div>'
+            + '<div class="g2048-stat"><div class="label">' + t('g2048_time', '用时') + '</div><div class="value" id="g2048Timer" style="font-variant-numeric:tabular-nums;">--:--</div></div>'
           + '</div>'
           + '<div class="g2048-board-wrap" id="g2048BoardWrap"></div>'
           + '<div class="g2048-hint" id="g2048Hint">' + t('g2048_hint', '方向键 / 滑动 移动方块') + '</div>'
@@ -230,6 +261,9 @@
       canvas.id = 'g2048Canvas';
       document.getElementById('g2048BoardWrap').appendChild(canvas);
       ctx = canvas.getContext('2d', { preserveDrawingBuffer: true });
+
+      _timerEnd = 0;
+      if (_timerRaf) { clearInterval(_timerRaf); _timerRaf = null; }
 
       computeLayout();
 
@@ -262,6 +296,18 @@
       if (scoreEl) scoreEl.textContent = state.score;
       if (bestEl) bestEl.textContent = state.highScore;
       if (maxEl) maxEl.textContent = state.maxTile;
+
+      // Timer
+      if (state && state.startTime) {
+        if (winner !== null && winner !== undefined && !_timerEnd) {
+          _timerEnd = Date.now();
+          if (_timerRaf) { clearInterval(_timerRaf); _timerRaf = null; }
+        }
+        updateTimer(state);
+        if ((winner === null || winner === undefined) && !_timerRaf) {
+          startTimer(state);
+        }
+      }
 
       var hintEl = document.getElementById('g2048Hint');
       if (hintEl) {

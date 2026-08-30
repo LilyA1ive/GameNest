@@ -6,6 +6,7 @@ exports.name = 'sudoku';
 exports.createBot = (playerIndex) => ({
   name: botName(playerIndex, 'zh'),
   getMove(state) {
+    if (state.eliminated && state.eliminated[playerIndex]) return {};
     const filled = state.filled[playerIndex];
     // Find the first blank cell this player hasn't filled yet.
     for (let r = 0; r < 9; r++) {
@@ -13,13 +14,7 @@ exports.createBot = (playerIndex) => ({
         if (state.puzzle[r][c] !== 0) continue;   // not a blank
         if (filled[r][c]) continue;               // already filled by this bot
 
-        let val = state.solution[r][c];            // the bot "cheats" — it's a bot
-        // 3% chance of a small mistake to feel human.
-        if (Math.random() < 0.03) {
-          let wrong = val;
-          while (wrong === val) wrong = 1 + Math.floor(Math.random() * 9);
-          val = wrong;
-        }
+        const val = state.solution[r][c];            // the bot "cheats" — it's a bot
         return { type: 'fill', row: r, col: c, val: val };
       }
     }

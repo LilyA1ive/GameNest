@@ -504,15 +504,27 @@ function scheduleRealtimeGame(room) {
   const gameMod = room && gameRegistry[room.game];
   if (!gameMod || !gameMod.realtime || typeof gameMod.tick !== 'function') return;
   stopRealtimeGame(room);
+  // Per-bot cooldown: game modules export botInterval: {min, max} (ms) to space
+  // out bot moves. Without it, bots act every tick and finish far too fast.
+  const interval = gameMod.botInterval || null;
+  room._botNextMove = room._botNextMove || {}; // index -> timestamp (ms) when bot may act
   room._realtimeTimer = setInterval(() => {
     if (!rooms.has(room._roomId) || room.phase !== 'playing' || room.state.winner !== null) {
       stopRealtimeGame(room);
       return;
     }
     try {
+      const now = Date.now();
       for (const [index, bot] of room.bots) {
+        const nextAllowed = room._botNextMove[index] || 0;
+        if (now < nextAllowed) continue; // still on cooldown
         const move = bot.getMove(room.state);
         gameMod.handleMove(move, room.state, index);
+        // Schedule next move after a random delay within the game's interval
+        if (interval) {
+          const delay = interval.min + Math.floor(Math.random() * (interval.max - interval.min));
+          room._botNextMove[index] = now + delay;
+        }
       }
       gameMod.tick(room.state);
       broadcastGameView(room, 'game_state');

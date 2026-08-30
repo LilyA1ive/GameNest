@@ -1,5 +1,5 @@
 // public/js/renderers/sudoku.js
-// Sudoku — Multiplayer speed race renderer. Canvas grid + number pad.
+// Sudoku — Multiplayer speed race renderer. Canvas grid + number pad + lives + hints + timer.
 (function () {
   window.gameRenderers = window.gameRenderers || new Map();
 
@@ -9,6 +9,8 @@
   var _pending = null;    // {r, c, val} fill sent to server, awaiting resolution
   var _flash = null;      // {r, c, start} red-flash animation for a wrong fill
   var _flashRaf = null;
+  var _timerEnd = 0;      // epoch ms when the game ended (freeze timer display)
+  var _timerRaf = null;   // interval handle for the live timer
   var _inited = false;
 
   var ACCENT = '#c8a45c';
@@ -22,10 +24,19 @@
   }
 
   var STYLES = ''
-    + '.su-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;}'
+    + '.su-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;}'
     + '.su-status{text-align:center;font-size:15px;font-weight:700;min-height:22px;letter-spacing:.3px;}'
+    + '.su-timer{text-align:center;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text-muted);min-height:20px;letter-spacing:.5px;}'
+    + '.su-lives{display:flex;gap:4px;font-size:22px;line-height:1;min-height:26px;align-items:center;}'
+    + '.su-lives .hp{transition:transform .2s,opacity .2s;}'
+    + '.su-lives .hp.lost{opacity:.25;transform:scale(.7);}'
     + '.su-board-wrap{display:flex;justify-content:center;touch-action:manipulation;}'
     + '.su-board-wrap canvas{display:block;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.18);touch-action:manipulation;}'
+    + '.su-controls{display:flex;gap:8px;width:100%;max-width:360px;align-items:center;}'
+    + '.su-hint{flex:1;height:48px;border:1px solid var(--border);border-radius:12px;background:var(--surface);font-size:15px;font-weight:700;color:var(--text);cursor:pointer;transition:transform .08s,background .15s;user-select:none;-webkit-user-select:none;display:flex;align-items:center;justify-content:center;gap:6px;}'
+    + '.su-hint:active{transform:scale(.95);}'
+    + '.su-hint[disabled]{opacity:.35;cursor:default;}'
+    + '.su-hint-badge{font-size:13px;font-weight:600;color:var(--accent);}'
     + '.su-pad{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;width:100%;max-width:360px;}'
     + '.su-num{height:52px;border:1px solid var(--border);border-radius:12px;background:var(--surface);font-size:20px;font-weight:700;color:var(--text);cursor:pointer;transition:transform .08s,background .15s;user-select:none;-webkit-user-select:none;}'
     + '.su-num:active{transform:scale(.93);}'
@@ -35,8 +46,8 @@
     + '@media(min-width:768px){.su-num{height:60px;font-size:22px;}}';
 
   function computeLayout() {
-    var maxBoard = Math.min(window.innerWidth - 24, 520, window.innerHeight * 0.58);
-    maxBoard = Math.max(maxBoard, 260);
+    var maxBoard = Math.min(window.innerWidth - 24, 520, window.innerHeight * 0.5);
+    maxBoard = Math.max(maxBoard, 240);
     var size = Math.floor(maxBoard);
     var cell = size / N;
     _layout.size = size;
@@ -143,7 +154,7 @@
     var pad = document.getElementById('suPad');
     if (!pad) return;
     var state = window._suState;
-    var hasSel = _selected && state && state.winner === null
+    var hasSel = _selected && state && state.winner === null && !state.eliminated
       && state.board[_selected.r][_selected.c].value === 0;
     var nums = pad.querySelectorAll('.su-num[data-v]');
     for (var i = 0; i < nums.length; i++) {
@@ -153,9 +164,65 @@
     }
   }
 
+  function formatTime(ms) {
+    var totalSec = Math.floor(ms / 1000);
+    var m = Math.floor(totalSec / 60);
+    var s = totalSec % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function updateTimer(state) {
+    var el = document.getElementById('suTimer');
+    if (!el) return;
+    if (!state || !state.startTime) { el.textContent = ''; return; }
+    var end = (state.winner !== null && state.winner !== undefined) ? _timerEnd : Date.now();
+    el.textContent = '⏱ ' + formatTime(end - state.startTime);
+  }
+
+  function startTimer(state) {
+    if (_timerRaf) { clearInterval(_timerRaf); _timerRaf = null; }
+    if (!state || !state.startTime) return;
+    _timerEnd = 0;
+    updateTimer(state);
+    _timerRaf = setInterval(function () {
+      var s = window._suState;
+      if (!s || (s.winner !== null && s.winner !== undefined)) {
+        if (_timerRaf) { clearInterval(_timerRaf); _timerRaf = null; }
+        return;
+      }
+      updateTimer(s);
+    }, 250);
+  }
+
+  function updateLives(state) {
+    var el = document.getElementById('suLives');
+    if (!el || !state) return;
+    var lives = state.lives || 0;
+    var html = '';
+    for (var i = 0; i < 3; i++) {
+      html += '<span class="hp' + (i < lives ? '' : ' lost') + '">❤️</span>';
+    }
+    el.innerHTML = html;
+  }
+
+  function updateHintBtn(state) {
+    var btn = document.getElementById('suHint');
+    if (!btn || !state) return;
+    var hints = state.hints || 0;
+    var dead = state.eliminated || state.winner !== null;
+    btn.disabled = dead || hints <= 0;
+    var badge = btn.querySelector('.su-hint-badge');
+    if (badge) badge.textContent = '×' + hints;
+  }
+
   function updateStatus(state, winner) {
     var el = document.getElementById('suStatus');
     if (!el) return;
+    if (state && state.eliminated) {
+      el.textContent = t('sudoku_dead', '你已出局');
+      el.style.color = '#e74c3c';
+      return;
+    }
     if (winner !== null && winner !== undefined) {
       el.textContent = winner === -1 ? t('draw', '平局') : (winner === _playerIndex ? t('you_win', '你赢了') : t('opponent_wins', '对手获胜'));
       el.style.color = winner === _playerIndex ? ACCENT : 'var(--text-muted)';
@@ -167,7 +234,7 @@
 
   window._sudokuSelect = function (r, c) {
     var state = window._suState;
-    if (!state || state.winner !== null) return;
+    if (!state || state.winner !== null || state.eliminated) return;
     var cell = state.board[r][c];
     if (cell.given || cell.mineFill) return; // immutable or already solved
     _selected = { r: r, c: c };
@@ -178,7 +245,7 @@
 
   window._sudokuFill = function (val) {
     var state = window._suState;
-    if (!state || state.winner !== null) return;
+    if (!state || state.winner !== null || state.eliminated) return;
     if (!_selected) return;
     var r = _selected.r, c = _selected.c;
     var cell = state.board[r][c];
@@ -196,13 +263,27 @@
     drawFrame();
   };
 
+  window._sudokuHint = function () {
+    var state = window._suState;
+    if (!state || state.winner !== null || state.eliminated) return;
+    if (state.hints <= 0) return;
+    window.makeGameMove({ type: 'hint' });
+  };
+
   window.gameRenderers.set('sudoku', {
     init: function (container) {
       injectStylesOnce('suStyles', STYLES);
       container.innerHTML = ''
         + '<div class="su-wrap">'
           + '<div class="su-status" id="suStatus"></div>'
+          + '<div class="su-timer" id="suTimer"></div>'
+          + '<div class="su-lives" id="suLives"></div>'
           + '<div class="su-board-wrap" id="suBoardWrap"></div>'
+          + '<div class="su-controls">'
+            + '<button class="su-hint" id="suHint" onclick="window._sudokuHint()">'
+              + t('sudoku_hint', '提示') + ' <span class="su-hint-badge" id="suHintBadge">×3</span>'
+            + '</button>'
+          + '</div>'
           + '<div class="su-pad" id="suPad">'
             + '<button class="su-num" data-v="1" onclick="window._sudokuFill(1)">1</button>'
             + '<button class="su-num" data-v="2" onclick="window._sudokuFill(2)">2</button>'
@@ -225,6 +306,8 @@
       _selected = null;
       _pending = null;
       _flash = null;
+      _timerEnd = 0;
+      if (_timerRaf) { clearInterval(_timerRaf); _timerRaf = null; }
 
       computeLayout();
 
@@ -270,6 +353,21 @@
       if (!ctx) ctx = canvas.getContext('2d');
       computeLayout();
       updateStatus(state, winner);
+      updateLives(state);
+      updateHintBtn(state);
+
+      // Timer: start on first render, freeze on game over
+      if (state && state.startTime) {
+        if (winner !== null && winner !== undefined && !_timerEnd) {
+          _timerEnd = Date.now();
+          if (_timerRaf) { clearInterval(_timerRaf); _timerRaf = null; }
+        }
+        updateTimer(state);
+        if ((winner === null || winner === undefined) && !_timerRaf) {
+          startTimer(state);
+        }
+      }
+
       drawFrame();
     },
   });

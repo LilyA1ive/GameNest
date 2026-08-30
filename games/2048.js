@@ -9,12 +9,15 @@ exports.minPlayers = 1;
 exports.maxPlayers = 4;
 exports.realtime = true; // racing, non-turn (like minesweeper / sudoku)
 exports.tickMs = 600;
+// Bot moves every 1.5-3s — fast enough to feel alive, slow enough to beat
+exports.botInterval = { min: 1500, max: 3000 };
 
 exports.createState = () => ({
   seedBoard: [],   // 4x4 shared starting board (2 random tiles)
   boards: [],      // per-player 4x4 current board
   scores: [],      // per-player cumulative score
   alive: [],       // per-player bool: can still move
+  startTime: 0,    // epoch ms when the round started (for timer display)
   winner: null,
   currentPlayer: -1,
 });
@@ -33,6 +36,7 @@ exports.initGame = (state, playerCount) => {
     state.scores.push(0);
     state.alive.push(true);
   }
+  state.startTime = Date.now();
   state.winner = null;
   state.currentPlayer = -1;
 };
@@ -47,6 +51,7 @@ exports.playerView = (state, playerIndex) => ({
   currentPlayer: state.currentPlayer,
   maxTile: maxTile(state.boards[playerIndex]),
   highScore: state.scores.reduce((m, v) => (v > m ? v : m), 0),
+  startTime: state.startTime,
 });
 
 const DIRS = ['up', 'down', 'left', 'right'];

@@ -55,6 +55,20 @@ exports.createBot = (playerIndex) => ({
       return { placeIndex: Math.floor(Math.random() * (own.length + 1)) };
     }
 
+    // PENALTY PHASE: must reveal one of own hidden tiles
+    if (state.phase === 'penalty' && state.penaltyPlayer === playerIndex) {
+      const own = state.tiles[playerIndex];
+      const rev = state.numRevealed[playerIndex];
+      const hidden = [];
+      for (let i = 0; i < own.length; i++) {
+        if (!rev[i]) hidden.push(i);
+      }
+      if (hidden.length > 0) {
+        return { revealIndex: hidden[Math.floor(Math.random() * hidden.length)] };
+      }
+      return { revealIndex: 0 };
+    }
+
     if (state.phase === 'guess') {
       // After a correct guess: 40% chance to stop instead of continuing
       if (state.lastGuessResult && state.lastGuessResult.correct &&

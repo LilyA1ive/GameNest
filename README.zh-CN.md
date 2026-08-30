@@ -2,7 +2,7 @@
 
 > 27 款自托管局域网桌游、卡牌、聚会、益智和实时对战游戏。一台设备开服，分享房间号或二维码，同一 WiFi 下用浏览器就能一起玩。
 
-**[🚀 在线试玩](https://game-production-03da.up.railway.app/) — 无需安装，打开即玩。**
+**[🚀 在线试玩](https://gamenest-4kww.onrender.com) — 无需安装，打开即玩。**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/absswds/GameNest/actions/workflows/ci.yml/badge.svg)](https://github.com/absswds/GameNest/actions/workflows/ci.yml)

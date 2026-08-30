@@ -2,7 +2,7 @@
 
 > 27 self-hosted LAN board, card, party, puzzle, and real-time games. Start one server, share one room code or QR code, and play from any browser on the same WiFi.
 
-**[🚀 Live Demo](https://game-production-03da.up.railway.app/) — try it without installing.**
+**[🚀 Live Demo](https://gamenest-4kww.onrender.com) — try it without installing.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/absswds/GameNest/actions/workflows/ci.yml/badge.svg)](https://github.com/absswds/GameNest/actions/workflows/ci.yml)

@@ -366,7 +366,21 @@
     drawClaimEffects();
     drawTurnIndicator();
     drawPlayerNames();
+    drawWallCount();
     drawScorePanel();
+  }
+
+  // 牌库余量显示
+  function drawWallCount() {
+    var count = _state.deckCount || (_state.deck && _state.deck.length) || 0;
+    if (!count) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('余牌: ' + count, W / 2, H / 2 + 85);
+    ctx.restore();
   }
 
   function drawOpponents() {
@@ -444,17 +458,14 @@
   function buildDiscardSequence() {
     var seq = [];
     if (!_state.discards) return seq;
-    var maxLen = 0;
     for (var s = 0; s < _state.discards.length; s++) {
-      maxLen = Math.max(maxLen, _state.discards[s].length);
-    }
-    for (var r = 0; r < maxLen; r++) {
-      for (var s2 = 0; s2 < _state.discards.length; s2++) {
-        if (_state.discards[s2][r]) {
-          seq.push({ tile: _state.discards[s2][r], player: s2 });
-        }
+      for (var i = 0; i < _state.discards[s].length; i++) {
+        var t = _state.discards[s][i];
+        seq.push({ tile: t, player: s, seq: t._discardSeq || 0 });
       }
     }
+    // 严格按出牌时间排序
+    seq.sort(function(a, b) { return a.seq - b.seq; });
     return seq;
   }
 

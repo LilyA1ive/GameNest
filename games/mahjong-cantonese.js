@@ -158,6 +158,8 @@ exports.handleMove = function (data, state, playerIndex) {
       const idx = hand.findIndex(t => t.id === tileId);
       if (idx === -1) return 'mj_tile_not_in_hand';
       const tile = hand.splice(idx, 1)[0];
+      tile._discardSeq = (state._discardCounter || 0);
+      state._discardCounter = (state._discardCounter || 0) + 1;
       state.discards[playerIndex].push(tile);
       state.lastDiscard = { tile, player: playerIndex };
       state.hasDrawn = false;

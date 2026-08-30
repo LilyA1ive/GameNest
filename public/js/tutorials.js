@@ -19,7 +19,7 @@
     sudoku: {
       sections: [
         { h: '游戏目标', p: '同一道数独题，比拼谁先正确填满所有空格。' },
-        { h: '玩法', p: '点击空格选择数字 1-9。填对才计分，填错不扣分但浪费回合。先填满所有空格的玩家获胜。' },
+        { h: '玩法', p: '点击空格选择数字 1-9。填对才计分，填错扣一条命（共3条命）。命用完即淘汰。每局可点3次"提示"自动揭示一个空格。先填满所有空格的玩家获胜。' },
         { h: '策略', p: '从数字出现最多的行/列/宫入手，逐步缩小范围。' },
       ]
     },
@@ -140,11 +140,34 @@
     },
     'mahjong-sichuan': {
       sections: [
-        { h: '游戏目标', p: '凑出胡牌牌型（4组面子+1对将），成为最后存活的玩家。' },
-        { h: '定缺', p: '开局选择一门花色（万/筒/条）作为缺门。胡牌时手里不能有缺门花色。' },
-        { h: '基本操作', p: '碰：别人打出你手里有2张的牌，组成3张。杠：4张相同的牌。胡：凑成胡牌牌型即可胡。' },
-        { h: '血战到底', p: '一家胡了不代表结束，其他玩家继续打，直到3家胡或牌摸完。' },
-        { h: '胡牌牌型', p: '标准型：4组面子（顺子或刻子）+1对将。七对：7个对子。' },
+        { h: '游戏目标', p: '凑出胡牌牌型（4组面子+1对将），成为胡牌的玩家。四川麻将采用"血战到底"规则——一家胡了不结束，继续打到3家胡或流局。' },
+        { h: '定缺（门清）', p: '开局必须选一门花色（万/筒/条）作为"缺门"。胡牌时手里绝对不能有缺门花色！建议选手里最少的那门。流局时手里还有三门花色（称为"花猪"）要包赔所有玩家。' },
+        { h: '什么叫面子', p: '面子是胡牌的基本组合，有三种：①顺子——同花色连续3张（如2万3万4万、5筒6筒7筒）；②刻子——3张完全相同（如3筒3筒3筒、9条9条9条）；③杠——4张相同（算作一组面子，额外加分）。' },
+        { h: '什么叫将', p: '将是对子——2张完全相同的牌（如东东西北北）。胡牌必须有且仅有1对将。不能没有将，也不能有2对将（除非七对）。' },
+        { h: '怎么碰牌', p: '别人打出的牌，你手里有2张相同 → 可以碰。碰后组成3张刻子亮在自己面前，然后你必须立即打出一张牌。碰了之后不能摸牌，直接出牌。碰牌对所有花色有效（包括字牌/风牌/箭牌）。' },
+        { h: '怎么杠牌', p: '有三种杠：①暗杠——自己摸到4张相同的牌，直接杠出来；②明杠（加杠）——手里有3张，别人打出第4张；③点杠——碰完后摸到第4张。杠后从牌尾补一张牌。杠上开花（补牌即胡）算一番。明杠被别人胡牌叫"杠上炮"。' },
+        { h: '怎么胡牌', p: '两种方式：①自摸——自己摸到的牌凑成胡牌牌型；②点炮（接炮）——别人打出的牌你正好需要。胡牌公式：4组面子 + 1对将 = 胡。或者7个不同的对子（七对）。' },
+        { h: '胡牌牌型详解', p: '标准型：4组面子（顺子或刻子）+ 1对将。例如：234万+567万+222筒+888条+东东 = 胡。七对：7个不同的对子（如22万+55万+33筒+44筒+66条+88条+东东）。十三幺：1万9万1筒9筒1条9条+东南西北中发白+其中任意一张重复。' },
+        { h: '番种与计分', p: '素胡（平胡）0番起算。缺一门+1、卡张（嵌张）+1、边张+1、单钓将+1、自摸+1、断幺九（无1/9/字）+1。对对和+2、混一色+2。清一色+8、七对+4、龙七对+8。杠上花+1、海底捞（最后一张自摸）+1。根（手中有4张相同的牌未杠）每根+1。' },
+        { h: '刮风（杠的得分）', p: '明杠（别人点杠）：点杠者给你3分；暗杠：每家给你2分；补杠：每家给你1分。杠牌立即结算，不影响继续游戏。' },
+        { h: '血战到底规则', p: '一家胡牌后不结束！已胡的玩家退出，剩余玩家继续打，直到第3家胡或牌摸完。先胡的不一定是赢家——后胡的番数可能更大。策略：有时可以等更大的番再胡。' },
+        { h: '流局（荒庄）', p: '牌摸完没人胡 → 流局。查叫：听牌的玩家从每家得分；没听牌的赔付。花猪：手里还有三门花色，包赔所有玩家。查花猪：流局时手里有3门花色的玩家要赔。' },
+        { h: '买码（可选）', p: '部分玩法胡牌后从牌尾买若干张牌，买中花牌/字牌每张+1番。本版本暂不支持买码，胡牌即结算。' },
+        { h: '多局积分制', p: '游戏支持多局制。每局结束结算番数→累计积分。胡牌者下局坐庄，荒庄顺时针轮换。积分跨局累计，打完设定的局数后总分最高者获胜。' },
+        { h: '获胜策略', p: '①优先打缺——先把缺门花色打完，否则胡不了；②留搭子——保留能组成顺子的牌（如2万3万等1万或4万）；③注意别人碰杠——判断谁在做什么牌型，避免点炮；④血战到底时——先胡不一定赢，有时可以等更大的番；⑤听牌优先——尽早听牌（只差1张就能胡），提高胡牌概率。' },
+      ]
+    },
+    'mahjong-cantonese': {
+      sections: [
+        { h: '游戏目标', p: '广东鸡平胡——最快凑出胡牌牌型即可胡牌，一家胡即结束本局。节奏快，适合休闲。' },
+        { h: '可以吃牌', p: '与四川不同，广东麻将可以吃牌！上家打出的牌，你能组成顺子就可以吃。吃后必须立即出牌。吃牌只能吃上家（逆时针方向的上家）。' },
+        { h: '吃碰杠优先级', p: '胡 > 杠 > 碰 > 吃。多人同时胡牌时，离出牌者最近的人优先。碰和杠不能吃。' },
+        { h: '怎么碰牌', p: '别人打出的牌，你手里有2张相同 → 可以碰。碰后组成3张刻子亮在面前，然后立即出牌。碰对所有花色有效（包括字牌）。' },
+        { h: '怎么杠牌', p: '暗杠：自己摸到4张相同；明杠：手里有3张别人打出第4张；补杠：碰后摸到第4张。杠后从牌尾补一张。杠上开花+1番。' },
+        { h: '怎么胡牌', p: '自摸或点炮。胡牌公式：4组面子+1对将。七对也可胡。' },
+        { h: '番种', p: '平胡1番、自摸+1、混一色+2、对对和+2、清一色+8、字一色+8、三元（中发白）+8、三暗刻+8、天胡+8、地胡+8。' },
+        { h: '买码', p: '胡牌后自动从牌尾买4张牌。买中的花牌（春夏秋冬/梅兰竹菊）和字牌（中发白/东南西北）每张额外+1番。买码在胡牌后自动进行。' },
+        { h: '获胜策略', p: '鸡平胡节奏快，优先听牌；注意保留中张（4-6），边张（1/9）难组搭；观察对手吃碰判断其牌型；有胡就胡，不要贪大番。' },
       ]
     },
     texas: {
@@ -330,7 +353,7 @@
     sudoku: {
       sections: [
         { h: 'Objective', p: 'Same puzzle — race to fill all blanks correctly.' },
-        { h: 'Gameplay', p: 'Click a blank cell and pick a number 1-9. Only correct fills count. First to complete the puzzle wins.' },
+        { h: 'Gameplay', p: 'Click a blank cell and pick a number 1-9. Correct fills count; wrong guesses cost 1 of 3 lives. Run out and you\'re eliminated. Tap "Hint" up to 3 times to auto-reveal a cell. First to complete wins.' },
         { h: 'Strategy', p: 'Start with rows/columns/boxes that have the most numbers filled in.' },
       ]
     },
@@ -451,11 +474,33 @@
     },
     'mahjong-sichuan': {
       sections: [
-        { h: 'Objective', p: 'Form a winning hand (4 melds + 1 pair) and be the last player standing.' },
-        { h: 'Void Suit', p: 'Pick one suit (万/筒/条) to discard before playing. Your winning hand must have zero tiles of that suit.' },
-        { h: 'Actions', p: 'Pung (碰): claim a discard matching a pair in your hand to make 3. Kong (杠): 4 identical tiles. Win (胡): complete a winning hand.' },
-        { h: 'Blood Battle', p: 'After one player wins, others keep playing until 3 win or the wall is empty.' },
-        { h: 'Winning Hands', p: 'Standard: 4 melds (sequences or triplets) + 1 pair. Seven Pairs: 7 distinct pairs.' },
+        { h: 'Objective', p: 'Form a winning hand (4 melds + 1 pair) to win. Sichuan "Blood Battle" — after one player wins, others keep playing until 3 win or the wall is empty.' },
+        { h: 'Void Suit', p: 'At game start, pick one suit (万/筒/条) as your "void" suit. Your winning hand must have ZERO tiles of that suit! Choose the suit with fewest tiles. If you still have all 3 suits at draw ("花猪"), you pay everyone.' },
+        { h: 'What is a Meld', p: 'Three types: ①Sequence (顺子) — 3 consecutive tiles of same suit (e.g. 2万3万4万); ②Triplet (刻子) — 3 identical tiles (e.g. 3筒3筒3筒); ③Kong (杠) — 4 identical tiles (counts as a meld, bonus points).' },
+        { h: 'What is a Pair', p: 'The "将" (eyes) — 2 identical tiles (e.g. 东东). Every winning hand needs exactly 1 pair.' },
+        { h: 'How to Pung', p: 'When another player discards a tile you have 2 of → Pung to make a triplet. After punging, you must immediately discard a tile (no draw). Pung works for ALL tiles including honours (风/箭).' },
+        { h: 'How to Kong', p: 'Three types: ①Concealed Kong (暗杠) — draw all 4 yourself; ②Exposed Kong (明杠) — have 3, opponent discards the 4th; ③Added Kong (补杠) — pung then draw the 4th. After kong, draw a replacement tile from the wall tail. "杠上花" (win on replacement) = +1 fan.' },
+        { h: 'How to Win', p: 'Two ways: ①Self-draw (自摸) — complete the hand yourself; ②Discard win (点炮) — claim another player\'s discard. Formula: 4 melds + 1 pair = win. Or 7 distinct pairs (七对).' },
+        { h: 'Winning Patterns', p: 'Standard: 4 melds (sequences/triplets) + 1 pair. Example: 234万+567万+222筒+888条+东东 = win. Seven Pairs: 7 different pairs. Thirteen Orphans: 1万9万1筒9筒1条9条+东南西北中发白+any duplicate.' },
+        { h: 'Fan & Scoring', p: '平胡 0 fan base. 缺一门+1, 卡张+1, 边张+1, 单钓+1, 自摸+1, 断幺+1. 对对和+2, 混一色+2. 清一色+8, 七对+4, 龙七对+8. 杠上花+1, 海底捞+1. 根 (4 identical in hand) +1 each.' },
+        { h: 'Kong Payments', p: 'Exposed Kong: discarder pays 3 points. Concealed Kong: each player pays 2. Added Kong: each pays 1. Settled immediately.' },
+        { h: 'Blood Battle', p: 'After one player wins, they exit. Remaining players continue until 3 win or wall empties. First winner isn\'t necessarily the final winner — later wins can score higher.' },
+        { h: 'Draw (荒庄)', p: 'Wall empty, no winner → draw. 查叫: players who were "ready" (听牌) score from those who weren\'t. 花猪: any player with all 3 suits pays everyone.' },
+        { h: 'Multi-Round Scoring', p: 'Game supports multiple rounds. Each round: fan → points → cumulative total. Winner becomes next dealer; draw rotates clockwise. Highest total after all rounds wins.' },
+        { h: 'Winning Strategy', p: '①Discard your void suit first — you can\'t win with it; ②Keep "搭子" (partial sequences like 2万3万 waiting for 1万/4万); ③Watch opponents\' pungs/kongs — deduce their hand; ④In Blood Battle — sometimes wait for bigger fan; ⑤Prioritize reaching "ready" (听牌) status ASAP.' },
+      ]
+    },
+    'mahjong-cantonese': {
+      sections: [
+        { h: 'Objective', p: 'Cantonese (鸡平胡) — fastest to complete a winning hand wins. One win ends the round. Quick and casual.' },
+        { h: 'You Can Chow!', p: 'Unlike Sichuan, Cantonese mahjong allows chowing! If the player before you (upstream) discards a tile you can form a sequence with, you can chow. Must discard immediately after.' },
+        { h: 'Claim Priority', p: 'Win > Kong > Pung > Chow. If multiple players want to win, the one closest to discarder (in turn order) gets priority.' },
+        { h: 'How to Pung', p: 'Discard matches a pair in your hand → Pung to make triplet. Must discard immediately. Works for all tiles including honours.' },
+        { h: 'How to Kong', p: 'Concealed: draw all 4. Exposed: have 3, opponent discards 4th. Added: pung then draw 4th. Draw replacement from wall. 杠上花 (win on replacement) +1 fan.' },
+        { h: 'How to Win', p: 'Self-draw or claim discard. Formula: 4 melds + 1 pair. Seven Pairs also wins.' },
+        { h: 'Fan Types', p: '平胡 1 fan, 自摸 +1, 混一色 +2, 对对和 +2, 清一色 +8, 字一色 +8, 三元 +8, 三暗刻 +8, 天胡 +8, 地胡 +8.' },
+        { h: 'Buy Tiles (买码)', p: 'After winning, automatically buy 4 tiles from wall tail. Each flower (春夏秋冬/梅兰竹菊) or honour (中发白/东南西北) tile hit = +1 fan bonus.' },
+        { h: 'Winning Strategy', p: 'Fast-paced — prioritize reaching ready status; keep middle tiles (4-6), edge tiles (1/9) are hard to use; watch opponents\' chows/pungs to deduce their hands; don\'t greed for big fans — win when you can.' },
       ]
     },
     hearts: {

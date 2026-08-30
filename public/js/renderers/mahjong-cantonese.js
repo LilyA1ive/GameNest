@@ -102,8 +102,24 @@
     // current player highlight + status
     drawStatus();
 
+    // wall count
+    drawWallCount();
+
     // claim buttons
     updateClaimButtons();
+  }
+
+  // 牌库余量
+  function drawWallCount() {
+    var count = (_state.wall && _state.wall.length) || 0;
+    if (!count) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('余牌: ' + count, W / 2, H / 2 + 70);
+    ctx.restore();
   }
 
   function tileFace(x, y, w, h, tile, highlight) {
@@ -220,21 +236,17 @@
     }
   }
 
-  // 按出牌时间顺序构建弃牌序列（第0轮各家第0张→第1轮各家第1张…）
+  // 按出牌时间顺序构建弃牌序列（严格时间序）
   function buildDiscardSequence() {
     var seq = [];
     if (!_state.discards) return seq;
-    var maxLen = 0;
     for (var s = 0; s < _state.discards.length; s++) {
-      maxLen = Math.max(maxLen, _state.discards[s].length);
-    }
-    for (var r = 0; r < maxLen; r++) {
-      for (var s2 = 0; s2 < _state.discards.length; s2++) {
-        if (_state.discards[s2][r]) {
-          seq.push({ tile: _state.discards[s2][r], player: s2 });
-        }
+      for (var i = 0; i < _state.discards[s].length; i++) {
+        var t = _state.discards[s][i];
+        seq.push({ tile: t, player: s, seq: t._discardSeq || 0 });
       }
     }
+    seq.sort(function(a, b) { return a.seq - b.seq; });
     return seq;
   }
 
@@ -342,8 +354,8 @@
     if (coreHuCheck(test)) opts.push({ action: 'win', label: '胡', cls: 'mj-btn-win' });
 
     var mc = matchInHand(hand, tile.k, tile.n);
-    if (mc >= 3 && tile.k !== 'feng' && tile.k !== 'jian') opts.push({ action: 'kong', label: '杠' });
-    if (mc >= 2 && tile.k !== 'feng' && tile.k !== 'jian') opts.push({ action: 'pung', label: '碰' });
+    if (mc >= 3) opts.push({ action: 'kong', label: '杠' });
+    if (mc >= 2) opts.push({ action: 'pung', label: '碰' });
     if (isUpstream && tile.k !== 'feng' && tile.k !== 'jian') {
       // chow possible?
       if (canChow(hand, tile)) opts.push({ action: 'chow', label: '吃' });

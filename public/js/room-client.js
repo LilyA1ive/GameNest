@@ -267,6 +267,15 @@
           }
         }
       },
+      round_end(msg) {
+        if (state) {
+          state.cumulativeScore = msg.cumulativeScore;
+          state.dealerIndex = msg.dealerIndex;
+          state.roundNumber = msg.roundNumber;
+          state.winners = msg.winners;
+        }
+        renderGame();
+      },
       // Non-host asked to restart: notify the host.
       restart_requested(msg) {
         if (isHost) {

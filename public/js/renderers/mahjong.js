@@ -360,6 +360,7 @@
     drawClaimEffects();
     drawTurnIndicator();
     drawPlayerNames();
+    drawScorePanel();
   }
 
   function drawOpponents() {
@@ -948,10 +949,22 @@
   }
 
   function onClick(e) {
-    if (!_layout.length) return;
     var rect = canvas.getBoundingClientRect();
     var x = (e.clientX - rect.left) * (W / rect.width);
     var y = (e.clientY - rect.top) * (H / rect.height);
+    // 结算界面：点击"下一局"按钮 → 发送 restart
+    if (_state && _state.phase === 'over') {
+      var panelW = Math.min(380, W - 40);
+      var panelH = 280;
+      var px = (W - panelW) / 2;
+      var py = (H - panelH) / 2;
+      if (x >= W/2 - 60 && x <= W/2 + 60 && y >= py + panelH - 50 && y <= py + panelH - 14) {
+        if (window.makeGameMove) window.makeGameMove({ type: 'restart' });
+        return;
+      }
+      return;
+    }
+    if (!_layout.length) return;
     var idx = hitTile(x, y);
     if (idx < 0) return;
     window._mjDiscard(idx);
@@ -964,6 +977,60 @@
     var y = (e.clientY - rect.top) * (H / rect.height);
     var idx = hitTile(x, y);
     if (idx !== _hoverIdx) { _hoverIdx = idx; draw(); }
+  }
+
+  // ---- 积分面板（Canvas 结算界面，phase === 'over' 时绘制）----
+  function drawScorePanel() {
+    if (!_state || _state.phase !== 'over') return;
+    var panelW = Math.min(380, W - 40);
+    var panelH = 280;
+    var px = (W - panelW) / 2;
+    var py = (H - panelH) / 2;
+
+    // 半透明遮罩
+    ctx.fillStyle = 'rgba(0,0,0,.65)';
+    ctx.fillRect(0, 0, W, H);
+
+    // 面板
+    ctx.fillStyle = '#1a2a1a';
+    roundRect(px, py, panelW, panelH, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200,164,92,.5)';
+    ctx.lineWidth = 2;
+    roundRect(px, py, panelW, panelH, 16);
+    ctx.stroke();
+
+    // 标题
+    ctx.fillStyle = '#c8a45c';
+    ctx.font = 'bold 20px system-ui,"Microsoft YaHei",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('本局结算', W / 2, py + 32);
+
+    // 玩家列表
+    var cumScore = _state.cumulativeScore || [0,0,0,0];
+    var dealerIdx = _state.dealerIndex || 0;
+    ctx.font = '14px system-ui,"Microsoft YaHei",sans-serif';
+    for (var i = 0; i < _state.hands.length; i++) {
+      var yy = py + 60 + i * 36;
+      var isDealer = (i === dealerIdx);
+      var isWinner = (_state.winners || []).includes(i);
+      ctx.fillStyle = isWinner ? '#e05050' : (isDealer ? '#c8a45c' : 'rgba(255,255,255,.85)');
+      ctx.textAlign = 'left';
+      var label = '玩家' + (i + 1) + (isDealer ? ' (庄)' : '') + (i === _playerIndex ? ' (你)' : '');
+      if (isWinner) label += ' 胡!';
+      ctx.fillText(label, px + 20, yy);
+      ctx.textAlign = 'right';
+      ctx.fillText(cumScore[i] + '分', px + panelW - 20, yy);
+    }
+
+    // 下一局按钮
+    ctx.fillStyle = '#c8a45c';
+    roundRect(W/2 - 60, py + panelH - 50, 120, 36, 10);
+    ctx.fill();
+    ctx.fillStyle = '#1a1a1a';
+    ctx.font = 'bold 14px system-ui,"Microsoft YaHei",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('下一局', W / 2, py + panelH - 28);
   }
 
   // 回调：接线到 makeGameMove（与 room-client 的 webSocket 通信）

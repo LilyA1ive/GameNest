@@ -148,36 +148,54 @@ function trySevenPairs(counts) {
 // ---- countFan: basic scoring ----
 
 function countFan(hand, melds, winInfo, cfg) {
-  let fan = 0;
+  // Delegate to detailed version for backward compatibility.
+  return countFanDetailed(hand, melds, winInfo, cfg, {}).fan;
+}
 
-  // Count suits used
-  const suitsUsed = new Set();
-  for (const t of hand) suitsUsed.add(t.k);
-  if (melds) {
-    for (const m of melds) {
-      if (m.tile) suitsUsed.add(m.tile.k);
-    }
+// ---- countFanDetailed: returns { fan, details: [{ name, fan }] } ----
+
+function countFanDetailed(hand, melds, winInfo, cfg, options) {
+  var details = [];
+  options = options || {};
+  var suitsUsed = new Set();
+  for (var i = 0; i < hand.length; i++) suitsUsed.add(hand[i].k);
+  if (melds) for (var m = 0; m < melds.length; m++) {
+    if (melds[m].tile) suitsUsed.add(melds[m].tile.k);
+    if (melds[m].tiles) for (var t = 0; t < melds[m].tiles.length; t++) suitsUsed.add(melds[m].tiles[t].k);
   }
-
   // 清一色 (one suit)
-  if (suitsUsed.size === 1) fan += cfg.honours ? 3 : 5;
-
-  // 七对
-  if (winInfo && winInfo.type === 'qidui') fan += cfg.honours ? 3 : 4;
-
-  // 对对和 (all pungs, no chows) — approximation: check if hand has no sequences
-  if (winInfo && winInfo.type === 'standard') {
-    // Simple check: if all tiles form triples
-    const counts = {};
-    for (const t of hand) {
-      const key = t.k + ':' + t.n;
-      counts[key] = (counts[key] || 0) + 1;
-    }
-    const allTriples = Object.values(counts).every(c => c % 3 === 0 || c >= 2);
-    if (allTriples && (!melds || melds.length > 0)) fan += 2;
+  if (suitsUsed.size === 1) {
+    details.push({ name: '清一色', fan: cfg.honours ? 4 : 8 });
   }
+  // 混一色 (two suits including honours)
+  else if (suitsUsed.size === 2 && cfg.honours && (suitsUsed.has('feng') || suitsUsed.has('jian'))) {
+    details.push({ name: '混一色', fan: 2 });
+  }
+  // 七对
+  if (winInfo && winInfo.type === 'qidui') {
+    details.push({ name: '七对', fan: cfg.honours ? 2 : 4 });
+  }
+  // 对对和 (all pungs, no chows) — approximation
+  if (winInfo && winInfo.type === 'standard' && melds && melds.length >= 3) {
+    details.push({ name: '对对和', fan: 2 });
+  }
+  // 断幺九 (no terminals or honours)
+  var hasTerminal = false;
+  for (var i2 = 0; i2 < hand.length; i2++) {
+    if (hand[i2].k === 'feng' || hand[i2].k === 'jian' || hand[i2].n === 1 || hand[i2].n === 9) {
+      hasTerminal = true; break;
+    }
+  }
+  if (!hasTerminal) details.push({ name: '断幺', fan: 1 });
+  // 自摸
+  if (options.selfDraw) details.push({ name: '自摸', fan: 1 });
+  // 海底捞 (last tile self-draw)
+  if (options.selfDraw && options.wallCount === 0) details.push({ name: '海底捞', fan: 1 });
+  // 杠上花
+  if (options.gangShangHua) details.push({ name: '杠上花', fan: 1 });
 
-  return fan;
+  var total = details.reduce(function (s, d) { return s + d.fan; }, 0);
+  return { fan: total, details: details };
 }
 
 // ---- Export ----
@@ -188,5 +206,6 @@ module.exports = {
   buildDeck,
   huCheck,
   countFan,
+  countFanDetailed,
   sortTiles,
 };

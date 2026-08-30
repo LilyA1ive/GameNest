@@ -415,3 +415,51 @@ exports.setCurrentActor = function (state, candidate) {
   if (state._variants === 'cantonese') return;
   state.currentPlayer = candidate;
 };
+
+// ---- Scoring (四川麻将完整番种) ----
+
+function countGens(hand, melds) {
+  // 根：手中有4张相同的牌（未杠出来的）
+  var counts = {};
+  for (var i = 0; i < hand.length; i++) {
+    var key = hand[i].k + ':' + hand[i].n;
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  var gens = 0;
+  for (var k in counts) if (counts[k] === 4) gens++;
+  return gens;
+}
+
+function calculateScore(state, winnerIndex) {
+  var hand = state.hands[winnerIndex];
+  var melds = state.melds[winnerIndex];
+  var winInfo = core.huCheck(hand, melds, SICHUAN);
+  var isSelfDraw = (state._lastDiscardFrom !== winnerIndex);
+
+  var result = core.countFanDetailed(hand, melds, winInfo, SICHUAN, {
+    selfDraw: isSelfDraw,
+    wallCount: state.deck.length,
+    gangShangHua: false,
+  });
+
+  // 刮风/杠加分
+  var gangFan = 0;
+  for (var m = 0; m < melds.length; m++) {
+    if (melds[m].type === 'kong') {
+      gangFan += melds[m].from !== undefined ? 3 : 2;
+    }
+  }
+  if (gangFan > 0) result.details.push({ name: '杠', fan: gangFan });
+  result.fan += gangFan;
+
+  // 根
+  var genFan = countGens(hand, melds);
+  if (genFan > 0) {
+    result.details.push({ name: '根', fan: genFan });
+    result.fan += genFan;
+  }
+
+  return result;
+}
+
+exports.calculateScore = calculateScore;

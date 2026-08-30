@@ -220,30 +220,45 @@
     }
   }
 
-  function drawDiscards() {
-    var cx = W / 2, cy = H / 2;
-    var dw = TW * 0.7, dh = TH * 0.7;
-    ctx.fillStyle = 'rgba(255,255,255,.5)';
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('牌河', cx, cy - 70);
-
-    for (var p = 0; p < _state.discards.length; p++) {
-      var pile = _state.discards[p];
-      if (!pile || !pile.length) continue;
-      var pos = seatPos(p, _state._playerCount || 4);
-      var perRow = 8;
-      for (var i = 0; i < pile.length; i++) {
-        var row = Math.floor(i / perRow);
-        var col = i % perRow;
-        var ox, oy;
-        if (pos === 0) { ox = cx - (perRow * (dw + 2)) / 2 + col * (dw + 2); oy = cy + 50 + row * (dh + 2); }
-        else if (pos === 2) { ox = cx - (perRow * (dw + 2)) / 2 + col * (dw + 2); oy = cy - 60 - row * (dh + 2) - dh; }
-        else if (pos === 1) { ox = cx + 90 + row * (dw + 2); oy = cy - (perRow * (dh + 2)) / 2 + col * (dh + 2); }
-        else { ox = cx - 90 - row * (dw + 2) - dw; oy = cy - (perRow * (dh + 2)) / 2 + col * (dh + 2); }
-        var isLast = _state.lastDiscard && _state.lastDiscard.player === p && i === pile.length - 1;
-        tileFace(ox, oy, dw, dh, pile[i], isLast);
+  // 按出牌时间顺序构建弃牌序列（第0轮各家第0张→第1轮各家第1张…）
+  function buildDiscardSequence() {
+    var seq = [];
+    if (!_state.discards) return seq;
+    var maxLen = 0;
+    for (var s = 0; s < _state.discards.length; s++) {
+      maxLen = Math.max(maxLen, _state.discards[s].length);
+    }
+    for (var r = 0; r < maxLen; r++) {
+      for (var s2 = 0; s2 < _state.discards.length; s2++) {
+        if (_state.discards[s2][r]) {
+          seq.push({ tile: _state.discards[s2][r], player: s2 });
+        }
       }
+    }
+    return seq;
+  }
+
+  function drawDiscards() {
+    var allTiles = buildDiscardSequence();
+    if (allTiles.length === 0) return;
+    var dw = Math.round(TW * 0.55), dh = Math.round(TH * 0.55);
+    var gap = 3;
+    // 出牌区尺寸：手机占更大比例以利用空间
+    var isMobile = W < 500;
+    var zoneW = W * (isMobile ? 0.88 : 0.56);
+    var zoneH = H * (isMobile ? 0.40 : 0.34);
+    var zoneX = (W - zoneW) / 2;
+    var zoneY = (H - zoneH) / 2;
+    var perRow = Math.max(6, Math.floor(zoneW / (dw + gap)));
+    // 在长方形区域内网格排列（按出牌时间从左到右、从上到下）
+    for (var idx = 0; idx < allTiles.length; idx++) {
+      var row = Math.floor(idx / perRow);
+      var col = idx % perRow;
+      var x = zoneX + col * (dw + gap);
+      var y = zoneY + row * (dh + gap);
+      var dt = allTiles[idx];
+      var isLast = _state.lastDiscard && dt.tile.id === _state.lastDiscard.tile.id;
+      tileFace(x, y, dw, dh, dt.tile, isLast);
     }
   }
 

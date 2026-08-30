@@ -4,6 +4,7 @@ const { pick } = require('./lib/i18n');
 
 exports.name = 'numberbomb';
 exports.maxPlayers = 10;
+exports.minPlayers = 1;
 
 exports.createState = () => ({
   bomb: 0,

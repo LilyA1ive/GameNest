@@ -126,7 +126,25 @@
         var b = getFruit(pair.bodyB.id);
         if (!a || !b || a.merged || b.merged) return;
         if (a.type !== b.type) return;
-        if (a.type >= FRUITS.length - 1) return; // max size
+
+        // Two watermelons (max size) → both disappear, award points (official rule)
+        if (a.type >= FRUITS.length - 1) {
+          a.merged = true;
+          b.merged = true;
+          var wmX = (a.body.position.x + b.body.position.x) / 2;
+          var wmY = (a.body.position.y + b.body.position.y) / 2;
+          for (var wi = 0; wi < 12; wi++) {
+            var wangle = (wi / 12) * Math.PI * 2;
+            particles.push({ x: wmX, y: wmY, vx: Math.cos(wangle) * 4, vy: Math.sin(wangle) * 4 - 2, life: 1, color: FRUITS[a.type].color, r: 6 });
+          }
+          setTimeout(function () {
+            removeFruit(a);
+            removeFruit(b);
+            wsSend({ type: 'merge', fruitType: a.type });
+            saveSnapshot();
+          }, 0);
+          return;
+        }
 
         a.merged = true;
         b.merged = true;

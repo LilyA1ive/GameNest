@@ -2,7 +2,7 @@
 (function() {
   window.gameRenderers = window.gameRenderers || new Map();
 
-  var selectedCard = null;
+  var selectedCards = [];
   var SUIT_SYMBOL = { s: '♠', h: '♥', c: '♣', d: '♦' };
   var SUIT_COLOR = { s: '#1a1a1a', h: '#e74c3c', c: '#1a1a1a', d: '#e74c3c' };
 
@@ -203,7 +203,7 @@
       var html = '';
       for (var i = 0; i < hand.length; i++) {
         var c = hand[i];
-        var isSel = selectedCard === c.id;
+        var isSel = selectedCards.indexOf(c.id) !== -1;
         var isTheme = c.rank === s.themeRank;
 
         var bg = '#fff';
@@ -225,7 +225,7 @@
         else { label = SUIT_SYMBOL[c.suit] + c.rank; color = SUIT_COLOR[c.suit] || '#1a1a1a'; }
 
         html += '<div class="lb-card" data-id="' + c.id + '" style="' + style + 'color:' + color + ';"';
-        if (myTurn) html += ' onclick="window._lbSelectCard(\'' + c.id + '\')"';
+        if (myTurn) html += ' onclick="window._lbToggleCard(\'' + c.id + '\')"';
         html += '>' + label + '</div>';
       }
       el.innerHTML = html;
@@ -241,7 +241,10 @@
       if (!isAlive && winner == null) {
         html += '<div style="font-size:13px;color:var(--danger);text-align:center;width:100%;">' + _t('lb_spectating') + '</div>';
       } else if (myTurn) {
-        html += '<button class="btn btn-sm btn-primary" onclick="window._lbPlayCard()">' + _t('lb_play_card') + '</button>';
+        var selCount = selectedCards.length;
+        html += '<button class="btn btn-sm btn-primary" onclick="window._lbPlayCards()" ' +
+          (selCount === 0 ? 'disabled' : '') + '>' +
+          (selCount > 0 ? _tf('lb_play_n_cards', selCount) : _t('lb_play_card')) + '</button>';
         if (s.lastClaimant >= 0 && s.lastClaimant !== selfIdx) {
           html += '<button class="btn btn-sm" style="background:var(--danger);color:#fff;border:none;" onclick="window._lbSuspect()">' + _t('lb_suspect_btn') + '</button>';
         }
@@ -264,8 +267,14 @@
       label + '</span>';
   }
 
-  window._lbSelectCard = function(id) {
-    selectedCard = selectedCard === id ? null : id;
+  window._lbToggleCard = function(id) {
+    var idx = selectedCards.indexOf(id);
+    if (idx !== -1) {
+      selectedCards.splice(idx, 1);
+    } else {
+      if (selectedCards.length >= 3) return;
+      selectedCards.push(id);
+    }
     if (window._lbState) {
       var renderer = window.gameRenderers.get('liarsbar');
       var container = document.getElementById('boardArea');
@@ -274,10 +283,10 @@
     }
   };
 
-  window._lbPlayCard = function() {
-    if (!selectedCard) { showToast(_t('lb_toast_select_first')); return; }
-    window.makeGameMove({ action: 'play', cardId: selectedCard });
-    selectedCard = null;
+  window._lbPlayCards = function() {
+    if (selectedCards.length === 0) { showToast(_t('lb_toast_select_first')); return; }
+    window.makeGameMove({ action: 'play', cardIds: selectedCards.slice() });
+    selectedCards = [];
   };
 
   window._lbSuspect = function() {

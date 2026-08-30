@@ -58,7 +58,7 @@ cd android
 
 脚本会自动 / The script will:
 - 清理旧的 `app/src/main/assets/nodejs-project/` / Clean old assets
-- 复制 server.js、main.js、games/、bots/、public/、node_modules/、package.json / Copy project files
+- 复制 server.js、startup-port.js、games/、bots/、public/、node_modules/、package.json，以及 android/main.js / Copy project files (main.js is sourced from android/)
 - 删除 node_modules 中的 README、文档、测试文件以缩小 APK / Strip docs and tests from node_modules to reduce APK size
 
 ---
@@ -134,6 +134,7 @@ android/
             └── nodejs-project/           # 由 copy-nodejs-project.ps1 填充 / Populated by copy-nodejs-project.ps1
                 ├── server.js
                 ├── main.js
+                ├── startup-port.js
                 ├── games/
                 ├── bots/
                 ├── public/

@@ -6,7 +6,6 @@ const { getDifficulty } = require('./lib/difficulty');
 
 exports.name = 'hearts';
 
-var SUITS = ['s', 'h', 'c', 'd'];
 var RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
 function rankVal(rank) { return RANKS.indexOf(rank); }

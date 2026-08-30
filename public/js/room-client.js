@@ -32,6 +32,9 @@
       || { name: id, icon: '?', maxPlayers: 4, supportsAI: true };
   }
 
+  // Games that can be started and played solo (no AI / opponent needed).
+  const SOLO_GAMES = ['2048', 'sudoku', 'minesweeper', 'numberbomb', 'twentyfour', 'suikabattle', 'drawguess'];
+
   let roomOptions = {};
   let prevPlayerCount = 0;
   const gameInfo = _gt(game);
@@ -47,6 +50,13 @@
       bar._timer = null;
     }, 2500);
   }
+
+  // Toast for in-game hints (UNO draw/challenge, restart requests, etc.)
+  window.showToast = function(msg) {
+    notify(msg);
+  };
+  function showToast(msg) { notify(msg); }
+  function tf(key) { var args = Array.prototype.slice.call(arguments, 1); return String(_t(key)).replace(/%s/g, function() { return args.shift(); }); }
 
   function escapeHtml(str) {
     return String(str || '').replace(/[&<>"']/g, function(ch) {
@@ -217,12 +227,18 @@
         handleRoomJoined(msg);
       },
       game_state(msg) {
+        var wasRestart = false;
         if (state && state.winner != null && msg.state &&
             (msg.state.winner === null || msg.state.winner === undefined)) {
+          wasRestart = true;
           if (typeof unregisterAllActions === 'function') unregisterAllActions();
           currentRenderer = null;
           const container = el.boardArea;
           if (container) container.innerHTML = '';
+          // Host started a new game: non-hosts drop their result overlay.
+          if (!isHost && typeof window._updateOverlayForNewGame === 'function') {
+            window._updateOverlayForNewGame();
+          }
         }
         state = msg.state || state;
         players = msg.players || players;
@@ -241,6 +257,21 @@
         updatePlayerBar();
         renderGame();
         el.status.textContent = '';
+      },
+      // Host started a new game: non-hosts should drop their result overlay
+      // and see "continue" instead of "play again".
+      game_restart(msg) {
+        if (!isHost) {
+          if (typeof window._updateOverlayForNewGame === 'function') {
+            window._updateOverlayForNewGame();
+          }
+        }
+      },
+      // Non-host asked to restart: notify the host.
+      restart_requested(msg) {
+        if (isHost) {
+          showToast(tf('restart_request_notify', msg.by || 'Player'));
+        }
       },
       room_update(msg) {
         players = msg.players || players;
@@ -262,6 +293,19 @@
       error(msg) {
         if (msg.code === 'ROOM_NOT_FOUND' || (!state && /房间不存在|房间已结束/.test(msg.message || ''))) {
           clearExpiredRoomAndReturn();
+          return;
+        }
+        // UNO-specific hints: show a toast instead of a harsh error.
+        if (msg.code === 'uno_have_playable_card') {
+          showToast(_t('uno_have_playable_hint'));
+          return;
+        }
+        if (msg.code === 'uno_cannot_play_card') {
+          showToast(_t('uno_cannot_play'));
+          return;
+        }
+        if (msg.code === 'g_not_your_turn') {
+          showToast(_t('uno_opponent_turn'));
           return;
         }
         const ws2 = el.waitingStatus;
@@ -434,11 +478,14 @@
       };
     }
 
-    // Determine max slots
+    // Determine max slots: show occupied seats + 1 empty invite slot (capped at
+    // the game's max). This avoids wasting screen space on a wall of empty
+    // seats when only a couple of people are in the room.
     const defaultSlots = gameInfo.maxPlayers || 4;
-    const maxSlots = players && players.length > 0
-      ? Math.max(players.length, defaultSlots)
-      : defaultSlots;
+    let maxSlots = defaultSlots;
+    if (players && players.length > 0) {
+      maxSlots = Math.min(defaultSlots, Math.max(players.length + 1, 2));
+    }
 
     // Build slots
     const slots = el.waitingSlots;
@@ -454,6 +501,7 @@
         if (player.isHost) tagsHtml += '<span class="waiting-slot-badge host">👑 ' + _t('host') + '</span>';
         if (player.isBot) {
           tagsHtml += '<span class="waiting-slot-badge ai">🤖 AI</span>';
+          if (isHost) tagsHtml += '<button class="waiting-slot-remove-bot" data-bot-index="' + i + '" title="' + _t('remove_bot') + '" style="background:none;border:none;color:#e74c3c;font-size:14px;cursor:pointer;padding:0 4px;line-height:1;">✕</button>';
         } else if (disconnected) {
           tagsHtml += '<span class="waiting-slot-badge" style="background:#fff3e0;color:#e67e22">📱 ' + _t('in_lobby') + '</span>';
         } else if (player.ready) {
@@ -489,6 +537,15 @@
       btn.addEventListener('click', function() {
         const from = parseInt(this.dataset.from, 10);
         openSeatSwapModal(from, maxSlots);
+      });
+    });
+
+    // Attach remove-bot handlers (host only)
+    slots.querySelectorAll('.waiting-slot-remove-bot').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const botIndex = parseInt(this.dataset.botIndex, 10);
+        send('remove_bot', { botIndex });
       });
     });
 
@@ -748,6 +805,24 @@
         optionsEl.innerHTML =
           '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">' + _t('game_settings') + '</div>' +
           '<div style="font-size:13px;color:var(--text-muted)">' + _t('ec_board_size') + ': ' + bs2 + '×' + bs2 + ' · ' + _t('difficulty_label') + ': ' + rvDiffLabel2 + '</div>';
+      } else if (game === 'mahjong-sichuan') {
+        optionsEl.style.display = 'block';
+        var mjMode = roomOptions.mahjongMode || 'sichuan';
+        if (isHost) {
+          optionsEl.innerHTML =
+            '<div style="font-size:13px;font-weight:600;margin-bottom:8px;">' + _t('game_settings') + '</div>' +
+            '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;">' +
+              _t('mahjong_mode') + ': <select onchange="window._setGameOption(\'mahjongMode\', this.value)" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:14px;">' +
+                '<option value="sichuan"' + (mjMode === 'sichuan' ? ' selected' : '') + '>' + _t('mahjong_mode_sichuan') + '</option>' +
+                '<option value="cantonese"' + (mjMode === 'cantonese' ? ' selected' : '') + '>' + _t('mahjong_mode_cantonese') + '</option>' +
+              '</select>' +
+            '</label>';
+        } else {
+          optionsEl.innerHTML =
+            '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">' + _t('game_settings') + '</div>' +
+            '<div style="font-size:13px;color:var(--text-muted)">' + _t('mahjong_mode') + ': ' +
+              (mjMode === 'cantonese' ? _t('mahjong_mode_cantonese') : _t('mahjong_mode_sichuan')) + '</div>';
+        }
       } else if (isHost && gameInfo.supportsAI && window._gamesWithDifficulty.indexOf(game) >= 0) {
         // AI difficulty selector only for games whose bots actually read it
         optionsEl.style.display = 'block';
@@ -808,7 +883,7 @@
       if (isHost) {
         const allReady = players && players.filter(p => !p.isBot).every(p => p.ready);
         const totalPlayers = players ? players.length : 0;
-        const minPlayers = (game === 'suikabattle' || game === 'drawguess') ? 1 : 2;
+        const minPlayers = SOLO_GAMES.indexOf(game) >= 0 ? 1 : 2;
         const canStart = allReady && totalPlayers >= minPlayers;
         startBtn.disabled = !canStart;
         startBtn.classList.toggle('disabled', !canStart);
@@ -835,7 +910,8 @@
     if (waitingStatus) {
       const allReady = players && players.filter(p => !p.isBot).every(p => p.ready);
       const totalPlayers = players ? players.length : 0;
-      if (allReady && totalPlayers >= 2) {
+      const minNeeded = SOLO_GAMES.indexOf(game) >= 0 ? 1 : 2;
+      if (allReady && totalPlayers >= minNeeded) {
         waitingStatus.textContent = isHost ? _t('all_ready_start') : _t('waiting_host_start');
       } else {
         waitingStatus.textContent = _t('waiting_all_ready');
@@ -909,7 +985,8 @@
         st.textContent = _t('your_turn');
         st.classList.add('my-turn');
       }
-      else if (state) st.textContent = _t('opponent_turn');
+      else if (state && state.currentPlayer >= 0) st.textContent = _t('opponent_turn');
+      else if (state) st.textContent = _t('realtime_race');
     }
   }
 
@@ -968,16 +1045,61 @@
     var st = el.status;
     st.classList.remove('my-turn');
     st.textContent = isWin ? _t('you_win') : winner === -1 ? _t('draw') : _t('opponent_wins');
+
+    // Reset the overlay buttons to their defaults for this fresh result screen.
+    // (A previous game's _updateOverlayForNewGame may have changed them.)
+    var accentBtn = overlay.querySelector('.btn-accent');
+    if (accentBtn) {
+      accentBtn.textContent = _t('play_again');
+      accentBtn.onclick = function() { window.doRestart(); };
+    }
+    pendingRestart = false;
+
+    // Auto-close the overlay after 5s of inactivity.
+    clearTimeout(resultCloseTimer);
+    resultCloseTimer = setTimeout(function() {
+      overlay.style.display = 'none';
+    }, 5000);
   }
+
+  var resultCloseTimer = null;
+
+  // Called when the host starts a new round: replace "play again" with
+  // "continue game" for non-host players. The overlay stays visible so the
+  // player can press "continue" to dismiss it; the button now just hides the
+  // overlay (the new game is already in progress server-side).
+  window._updateOverlayForNewGame = function() {
+    var accentBtn = el.overlay.querySelector('.btn-accent');
+    if (accentBtn) {
+      accentBtn.textContent = _t('continue_game');
+      accentBtn.onclick = function() {
+        el.overlay.style.display = 'none';
+      };
+    }
+    clearTimeout(resultCloseTimer);
+  };
 
   window.makeGameMove = function(data) {
     send('game_move', data);
   };
 
+  var pendingRestart = false; // non-host clicked "play again", waiting for host
+
   window.doRestart = function() {
-    el.overlay.style.display = 'none';
-    if (typeof window._beforeGameRestart === 'function') window._beforeGameRestart();
-    send('game_restart');
+    // Host: confirm before restarting. Non-host: request host to restart.
+    if (isHost) {
+      if (!confirm(_t('restart_confirm'))) return;
+      el.overlay.style.display = 'none';
+      if (typeof window._beforeGameRestart === 'function') window._beforeGameRestart();
+      send('game_restart');
+    } else {
+      if (pendingRestart) return;
+      pendingRestart = true;
+      showToast(_t('restart_wait_host'));
+      send('request_restart', {});
+      // Reset the flag after 10s so they can re-request.
+      setTimeout(function() { pendingRestart = false; }, 10000);
+    }
   };
 
   window.doReturnToRoom = function() {
@@ -996,8 +1118,6 @@
       window.location.replace('/');
     }, 350);
   };
-
-  window._leaveRoom = window.doLeaveRoom;
 
   window.openAvatarDrawer = function() {
     if (el.avatarDrawer) el.avatarDrawer.style.display = 'flex';

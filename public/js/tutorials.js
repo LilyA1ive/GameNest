@@ -16,14 +16,29 @@
         { h: '策略提示', p: '注意防守对方的活三和活四，同时寻找自己的连珠机会。' },
       ]
     },
+    sudoku: {
+      sections: [
+        { h: '游戏目标', p: '同一道数独题，比拼谁先正确填满所有空格。' },
+        { h: '玩法', p: '点击空格选择数字 1-9。填对才计分，填错不扣分但浪费回合。先填满所有空格的玩家获胜。' },
+        { h: '策略', p: '从数字出现最多的行/列/宫入手，逐步缩小范围。' },
+      ]
+    },
+    '2048': {
+      sections: [
+        { h: '游戏目标', p: '同一起点，比拼谁先合成 2048。' },
+        { h: '玩法', p: '滑动方向键，相同数字合并为和。每次有效滑动后随机出现新数字（2 或 4）。先合成 2048 的玩家获胜。' },
+        { h: '策略', p: '把最大数字固定在角落，避免满盘后无法移动。' },
+      ]
+    },
     davinci: {
       sections: [
         { h: '游戏目标', p: '猜出所有对手的牌，成为最后存活的玩家。' },
         { h: '牌组', p: '26张牌：黑色 0-11、白色 0-11，外加 2 张万能牌（★）。万能牌可放在任意位置。' },
         { h: '排序规则', p: '数字从小到大排列，相同数字黑色在左、白色在右。万能牌停留在你放置的位置，不会被自动排序移动。' },
-        { h: '回合流程', p: '①抽牌：从牌堆抽一张牌自己看。②猜牌：点击对手的一张暗牌，选择颜色和数字进行猜测。③猜对：对手的牌翻开，可选择继续猜或结束。④猜错：进入惩罚阶段，必须翻开自己一张牌。⑤过：不猜，将抽到的牌面朝下插入自己的牌列。' },
-        { h: '惩罚阶段', p: '猜错后需翻开自己一张未翻的牌。点击自己的暗牌选择翻开哪张。' },
-        { h: '万能牌', p: '抽到万能牌时（包括开局抽到的第一张），需要自己选择把它插在牌列的哪个位置。放好之后整局都不会再移动。猜测万能牌时选择"★万能"颜色即可。' },
+        { h: '公开信息', p: '所有牌的颜色（黑/白）对所有人公开，只有数字是隐藏的。你需要猜对手牌的数字。' },
+        { h: '回合流程', p: '①抽牌：从牌堆抽一张牌（只有自己能看）。②猜牌：点击对手的一张牌，选择数字猜测，或按"猜★"猜万能牌。③猜对：对手牌显示数字，可选择继续猜或按"过"结束。④猜错：进入惩罚阶段，必须翻开自己一张牌。⑤过：不猜，将抽到的牌面朝下插入自己的牌列。' },
+        { h: '惩罚阶段', p: '猜错后需翻开自己一张未翻的牌。点击自己的暗牌选择翻开哪张。翻开后轮到下家。' },
+        { h: '万能牌', p: '抽到万能牌时（包括开局抽到的第一张），需要自己选择把它插在牌列的哪个位置。放好之后整局都不会再移动。猜万能牌时按"猜★"按钮。' },
       ]
     },
     uno: {
@@ -32,7 +47,8 @@
         { h: '出牌规则', p: '可以出与弃牌堆顶牌颜色相同或数字相同的牌。万能牌可随时出。' },
         { h: '功能牌', p: '⊘跳过：跳过下家。↻反转：改变出牌方向（2人时等同跳过）。+2：下家摸2张且跳过。★万能：可指定下个颜色。+4：万能且下家摸4张。' },
         { h: '叠加规则', p: '+2 和 +4 可以叠加！被罚 +2 的人可以出 +2 或 +4 将累计罚牌继续传递下去；被罚 +4 同理。如果不出叠加牌则必须一次性摸走所有累计罚牌。' },
-        { h: '摸牌', p: '无牌可出时必须摸1张。摸到可出的牌可立即出或保留。' },
+        { h: '+4 质疑', p: '下家可以质疑 +4 是否违规（即出牌者手里其实有同色牌）。质疑成功 → 出牌者抽4张；质疑失败 → 质疑者抽6张。质疑是盲猜，亮牌前先决定。' },
+        { h: '摸牌', p: '没有可出的牌时必须摸1张。摸到可出的牌可立即出或保留。' },
         { h: 'UNO!', p: '手牌只剩1张时记得喊 UNO！' },
       ]
     },
@@ -120,6 +136,15 @@
         { h: '出牌规则', p: '持 ♦3 者先出。必须出与上家相同张数和类型的牌型才能打过（同类型比大小）。不能打过则过牌。所有人过牌后，最后出牌者自由出牌。' },
         { h: '比大小', p: '牌面：3<4<5<6<7<8<9<10<J<Q<K<A<2。花色：♠>♥>♣>♦。同牌面时比花色。' },
         { h: '胜负', p: '先出完者胜。其余玩家按剩余牌数计分。' },
+      ]
+    },
+    'mahjong-sichuan': {
+      sections: [
+        { h: '游戏目标', p: '凑出胡牌牌型（4组面子+1对将），成为最后存活的玩家。' },
+        { h: '定缺', p: '开局选择一门花色（万/筒/条）作为缺门。胡牌时手里不能有缺门花色。' },
+        { h: '基本操作', p: '碰：别人打出你手里有2张的牌，组成3张。杠：4张相同的牌。胡：凑成胡牌牌型即可胡。' },
+        { h: '血战到底', p: '一家胡了不代表结束，其他玩家继续打，直到3家胡或牌摸完。' },
+        { h: '胡牌牌型', p: '标准型：4组面子（顺子或刻子）+1对将。七对：7个对子。' },
       ]
     },
     texas: {
@@ -275,6 +300,16 @@
         { h: '策略提示', p: '放置时分散战舰位置，避免集中。射击时利用命中后的相邻格追射，直到击沉。' },
       ]
     },
+    sanguosha: {
+      sections: [
+        { h: '游戏目标', p: '身份局，主公与反贼两大阵营对决。反贼除掉主公即胜，忠臣护主、内奸控场，主公清剿反贼。' },
+        { h: '身份分配', p: '看主公身份牌亮出后，其余玩家各拿一张暗置身份牌。通常按玩家人数配：主公1、忠臣、反贼、内奸。' },
+        { h: '基础牌', p: '「杀」用于攻击，「闪」用于躲避「杀」，「桃」回复体力。装备牌提供武器/防具/坐骑加成。锦囊牌一次性生效。' },
+        { h: '回合流程', p: '回合内依次：判定 → 摸牌 → 出牌 → 弃牌，然后交给下家。出牌阶段可出任意数量的杀（有连弩限制）。' },
+        { h: '胜负判定', p: '主公死亡：反贼胜（若只剩内奸则内奸胜）。反贼全灭：忠臣内奸需继续，直到主公阵营胜或内奸胜。' },
+        { h: '小贴士', p: '注意隐藏身份，谨慎出杀；内奸要平衡各方，最后再单挑主公。' },
+      ]
+    },
   };
 
   var TUTORIALS_EN = {
@@ -292,14 +327,29 @@
         { h: 'Strategy', p: 'Watch for your opponent\'s open-threes and open-fours while building your own winning lines.' },
       ]
     },
+    sudoku: {
+      sections: [
+        { h: 'Objective', p: 'Same puzzle — race to fill all blanks correctly.' },
+        { h: 'Gameplay', p: 'Click a blank cell and pick a number 1-9. Only correct fills count. First to complete the puzzle wins.' },
+        { h: 'Strategy', p: 'Start with rows/columns/boxes that have the most numbers filled in.' },
+      ]
+    },
+    '2048': {
+      sections: [
+        { h: 'Objective', p: 'Same starting board — race to reach 2048.' },
+        { h: 'Gameplay', p: 'Swipe to slide tiles. Equal numbers merge into their sum. A new tile (2 or 4) appears after each valid move. First to make 2048 wins.' },
+        { h: 'Strategy', p: 'Keep your biggest tile in a corner to avoid getting stuck.' },
+      ]
+    },
     davinci: {
       sections: [
         { h: 'Objective', p: 'Guess all opponents\' hidden tiles to become the last player standing.' },
         { h: 'Tile Set', p: '26 tiles: Black 0-11, White 0-11, plus 2 wild tiles (★). Wild tiles can be placed anywhere in your sequence.' },
         { h: 'Sorting Rule', p: 'Tiles are arranged smallest to largest; same number: black left, white right. Wild tiles stay where you place them — they won\'t be auto-sorted.' },
-        { h: 'Turn Flow', p: '① Draw: take a tile from the pile and look at it. ② Guess: click an opponent\'s face-down tile and guess its color & number. ③ Correct guess: the tile is revealed — you may guess again or end your turn. ④ Wrong guess: penalty phase — you must reveal one of your own tiles. ⑤ Pass: insert the drawn tile face-down into your sequence without guessing.' },
-        { h: 'Penalty Phase', p: 'After a wrong guess, you must flip up one of your own unrevealed tiles. Click your own hidden tile to choose which one to reveal.' },
-        { h: 'Wild Tile', p: 'When you draw a wild tile (including your first tile of the game), choose where to insert it in your sequence. It stays in that position for the entire game. When guessing a wild tile, select the "★ Wild" color option.' },
+        { h: 'Public Info', p: 'All tile colors (black/white) are public. Only the number is hidden. You guess the number of an opponent\'s tile.' },
+        { h: 'Turn Flow', p: '① Draw: take a tile from the pile (only you can see it). ② Guess: click an opponent\'s tile and guess its number, or press "Guess ★" for a wild tile. ③ Correct guess: the tile reveals its number — you may guess again or pass. ④ Wrong guess: penalty phase — you must reveal one of your own tiles. ⑤ Pass: insert the drawn tile face-down into your sequence without guessing.' },
+        { h: 'Penalty Phase', p: 'After a wrong guess, you must flip up one of your own unrevealed tiles. Click your own hidden tile to choose which one to reveal. Then the turn passes to the next player.' },
+        { h: 'Wild Tile', p: 'When you draw a wild tile (including your first tile of the game), choose where to insert it in your sequence. It stays in that position for the entire game. To guess a wild tile, press the "Guess ★" button.' },
       ]
     },
     uno: {
@@ -308,7 +358,8 @@
         { h: 'Play Rule', p: 'Play a card matching the color or number of the top discard. Wild cards can be played at any time.' },
         { h: 'Action Cards', p: '⊘ Skip: skip the next player. ↻ Reverse: reverse play direction (in 2-player, acts as Skip). +2: next player draws 2 and is skipped. ★ Wild: choose the next color. +4: wild card + next player draws 4.' },
         { h: 'Stacking', p: '+2 and +4 cards stack! If you\'re hit with a +2, you can play your own +2 or +4 to pass the accumulated penalty to the next player; same for +4. If you don\'t play a stacking card, you must draw all accumulated cards.' },
-        { h: 'Drawing', p: 'If you can\'t play any card, draw 1. You may play it immediately if eligible or keep it.' },
+        { h: '+4 Challenge', p: 'The next player can challenge whether the +4 was played illegally (i.e. the player actually held a matching color). If the challenge succeeds, the +4 player draws 4. If it fails, the challenger draws 6. The challenge is a blind guess — decide before the hand is revealed.' },
+        { h: 'Drawing', p: 'If you have no playable card, you must draw 1. You may play the drawn card immediately if eligible or keep it.' },
         { h: 'UNO!', p: 'Don\'t forget to shout UNO when you have only one card left!' },
       ]
     },
@@ -394,6 +445,21 @@
         { h: 'Objective', p: 'Be the first to play all your cards.' },
         { h: 'Combinations', p: 'Single, Pair, Three of a Kind, Straight (5+ consecutive), Flush (5 same suit), Full House (triple + pair), Four of a Kind (quad + single), Straight Flush (5 consecutive, same suit).' },
         { h: 'Play Rule', p: 'The player holding ♦3 leads. You must play the same number of cards and the same combination type as the previous play (same type, higher rank). If you can\'t beat it, pass. When everyone passes, the last player leads freely.' },
+        { h: 'Rank', p: '3<4<5<6<7<8<9<10<J<Q<K<A<2. Suit: ♠>♥>♣>♦. Same rank compares suit.' },
+        { h: 'Scoring', p: 'First to empty hand wins. Others score by remaining tile count.' },
+      ]
+    },
+    'mahjong-sichuan': {
+      sections: [
+        { h: 'Objective', p: 'Form a winning hand (4 melds + 1 pair) and be the last player standing.' },
+        { h: 'Void Suit', p: 'Pick one suit (万/筒/条) to discard before playing. Your winning hand must have zero tiles of that suit.' },
+        { h: 'Actions', p: 'Pung (碰): claim a discard matching a pair in your hand to make 3. Kong (杠): 4 identical tiles. Win (胡): complete a winning hand.' },
+        { h: 'Blood Battle', p: 'After one player wins, others keep playing until 3 win or the wall is empty.' },
+        { h: 'Winning Hands', p: 'Standard: 4 melds (sequences or triplets) + 1 pair. Seven Pairs: 7 distinct pairs.' },
+      ]
+    },
+    hearts: {
+      sections: [
         { h: 'Ranking', p: 'Face value: 3<4<5<6<7<8<9<10<J<Q<K<A<2. Suits: ♠>♥>♣>♦. Equal face values are broken by suit.' },
         { h: 'Victory', p: 'First to empty their hand wins. Other players score based on remaining cards.' },
       ]
@@ -549,6 +615,16 @@
         { h: 'Firing', p: 'Players take turns clicking a cell on the enemy grid to fire. Hits show a red X, misses show a gray dot. Sinking an entire ship highlights it in bold red.' },
         { h: 'Winning', p: 'Sink all 5 enemy ships to win. After the game ends, all enemy ship positions are revealed.' },
         { h: 'Strategy', p: 'Spread your ships out to avoid easy patterns. When you score a hit, fire at adjacent cells to track down the rest of the ship.' },
+      ]
+    },
+    sanguosha: {
+      sections: [
+        { h: 'Objective', p: 'Identity mode — a duel between lord and rebel factions. Rebels win by slaying the lord; loyalists protect him, the traitor plays all sides, and the lord cleans up the rebels.' },
+        { h: 'Roles', p: 'The Lord reveals his identity; everyone else draws a hidden role. Roles scale with player count: 1 Lord, loyalists, rebels, one traitor.' },
+        { h: 'Basic Cards', p: '「Slash」attacks, 「Dodge」blocks Slash, 「Peach」heals. Equipment cards boost weapon/armor/horse. Trick cards resolve once.' },
+        { h: 'Turn Flow', p: 'On your turn: judge → draw → play → discard, then pass. During the play phase you may use any number of Slashes (subject to the Crossbow limit).' },
+        { h: 'Winning', p: 'If the Lord dies, rebels win (unless only the traitor survives). If all rebels die, the Lord\'s side must finish the game, or the traitor wins by killing the Lord in a duel.' },
+        { h: 'Tip', p: 'Hide your role and slash carefully. The traitor balances the factions, then hunts the Lord at the end.' },
       ]
     },
   };

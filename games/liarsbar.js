@@ -62,6 +62,7 @@ function startNewRound(state) {
   state.pileCards = [];
   state.pileClaims = [];
   state.lastClaimant = -1;
+  state.lastPlayedCards = [];
   state.phase = 'playing';
 
   state.currentPlayer = nextAlive(state, state.roundStarter || 0);
@@ -76,6 +77,7 @@ exports.createState = () => {
     pileCards: [],
     pileClaims: [],
     lastClaimant: -1,
+    lastPlayedCards: [],   // cards played in the last turn (for challenge checking)
     alive: [],
     firedShots: [],          // [per player] how many times they've fired (0-6)
     roundStarter: 0,
@@ -169,17 +171,23 @@ exports.handleMove = (data, state, playerIndex) => {
   if (playerIndex !== state.currentPlayer) return 'g_not_your_turn';
 
   if (action === 'play') {
-    if (typeof cardId !== 'string') return 'lb_select_a_card';
+    const cardIds = data.cardIds;
+    if (!Array.isArray(cardIds) || cardIds.length === 0) return 'lb_select_a_card';
+    if (cardIds.length > 3) return 'lb_max_three_cards';
 
     const hand = state.hands[playerIndex];
     if (!hand || hand.length === 0) return 'lb_no_hand';
 
-    const idx = hand.findIndex(c => c.id === cardId);
-    if (idx === -1) return 'lb_card_not_in_hand';
+    const played = [];
+    for (const id of cardIds) {
+      const idx = hand.findIndex(c => c.id === id);
+      if (idx === -1) return 'lb_card_not_in_hand';
+      played.push(hand.splice(idx, 1)[0]);
+    }
 
-    const card = hand.splice(idx, 1)[0];
-    state.pileCards.push(card);
-    state.pileClaims.push({ playerIndex, cardId: card.id, claimedRank: state.themeRank });
+    for (const card of played) state.pileCards.push(card);
+    state.lastPlayedCards = played.map(c => ({ ...c }));
+    state.pileClaims.push({ playerIndex, cardIds: played.map(c => c.id), claimedRank: state.themeRank });
     state.lastClaimant = playerIndex;
     state.roundMessage = '';
     state.revealedPile = null;
@@ -193,7 +201,7 @@ exports.handleMove = (data, state, playerIndex) => {
     if (state.lastClaimant < 0) return 'lb_nothing_to_challenge';
     if (state.lastClaimant === playerIndex) return 'lb_cannot_challenge_self';
 
-    const lastCard = state.pileCards[state.pileCards.length - 1];
+    const played = state.lastPlayedCards || [];
     const claimedRank = state.themeRank;
 
     state.revealedPile = state.pileCards.map(c => ({ ...c }));
@@ -202,22 +210,25 @@ exports.handleMove = (data, state, playerIndex) => {
     let shooterIndices = [];
     let msg = '';
 
-    if (lastCard.suit === 'wild') {
-      shooterIndices.push(playerIndex);
-      msg = pick(state, '是万能牌★！万能牌永远是真话', '★ Wild card! Wild cards are always true');
-    } else if (lastCard.suit === 'ghost') {
+    // Check all cards played in the last turn
+    const hasGhost = played.some(c => c.suit === 'ghost');
+    const hasLie = played.some(c => c.suit !== 'wild' && c.suit !== 'ghost' && c.rank !== claimedRank);
+
+    if (hasGhost) {
       for (let i = 0; i < state.alive.length; i++) {
         if (state.alive[i] && i !== state.lastClaimant) shooterIndices.push(i);
       }
       msg = pick(state, '是鬼牌👻！除了出牌者，所有人都要开一枪', '👻 Ghost card! Everyone except the player takes a shot');
-    } else if (lastCard.rank === claimedRank) {
+    } else if (!hasLie) {
+      // All cards match the claim (wild counts as any rank)
       shooterIndices.push(playerIndex);
-      const sym = SUIT_SYMBOL[lastCard.suit] || '';
-      msg = pick(state, '质疑失败！上家出的确实是 ' + sym + claimedRank, 'Challenge failed! The previous player did play ' + sym + claimedRank);
+      msg = pick(state, '质疑失败！出的都是 ' + claimedRank + '（含万能牌）', 'Challenge failed! They were all ' + claimedRank + ' (or wild)');
     } else {
+      // At least one card is a lie
       shooterIndices.push(state.lastClaimant);
-      const sym = SUIT_SYMBOL[lastCard.suit] || '';
-      msg = pick(state, '质疑成功！上家出的是 ' + sym + lastCard.rank + '，不是 ' + claimedRank, 'Challenge successful! They played ' + sym + lastCard.rank + ', not ' + claimedRank);
+      const lieCard = played.find(c => c.suit !== 'wild' && c.suit !== 'ghost' && c.rank !== claimedRank);
+      const sym = SUIT_SYMBOL[lieCard.suit] || '';
+      msg = pick(state, '质疑成功！出的是 ' + sym + lieCard.rank + '，不是 ' + claimedRank, 'Challenge successful! They played ' + sym + lieCard.rank + ', not ' + claimedRank);
     }
 
     state.roundMessage = msg;

@@ -130,15 +130,17 @@ Then open `android/` in Android Studio and run the app. Full setup details live 
 ```text
 .
 |-- server.js                 # Express + WebSocket server, rooms, routing, bots
-|-- main.js                   # nodejs-mobile entry point for Android
+|-- desktop-entry.js          # desktop launcher (pkg entry; sits beside server.js)
+|-- startup-port.js           # port-retry helper required by server.js
 |-- games/                    # game rules and state transitions
 |-- bots/                     # AI move generators
 |-- lang/                     # server-side text
 |-- public/                   # browser lobby, game shell, renderers, styles, assets
 |-- scripts/                  # smoke simulations and maintenance helpers
 |-- tests/                    # node:test regression suites
-|-- android/                  # Android Studio wrapper project
-`-- docs/                     # architecture and release notes
+|-- android/                  # Android Studio wrapper project (incl. nodejs-mobile main.js)
+|-- docs/                     # architecture and release notes
+`-- archive/                  # local archive (not tracked by git)
 ```
 
 More details:

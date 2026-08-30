@@ -45,6 +45,7 @@ exports.createState = () => ({
   winner: null,
   drawStack: 0,
   unoCalled: [],     // per-player: has called UNO when at 1 card
+  pendingChallenge: null,  // { by, target, handSnapshot, priorColor, chosenColor } | null
 });
 
 function initGame(state, playerCount) {
@@ -65,12 +66,19 @@ function initGame(state, playerCount) {
   state.winner = null;
   state.drawStack = 0;
   state.unoCalled = Array(playerCount).fill(true); // start true (no need at game start)
+  state.pendingChallenge = null;
 }
 exports.initGame = initGame;
 
 function nextPlayer(state) {
   const n = state.hands.length;
   return ((state.currentPlayer + state.direction) % n + n) % n;
+}
+
+// Next player after an explicit `from` index (used to skip the +4 target).
+function nextPlayerFrom(state, fromIndex) {
+  const n = state.hands.length;
+  return ((fromIndex + state.direction) % n + n) % n;
 }
 
 function canPlay(card, state) {
@@ -103,10 +111,41 @@ exports.handleMove = (data, state, playerIndex) => {
     initGame(state, count);
   }
 
-  if (playerIndex !== state.currentPlayer) return 'g_not_your_turn';
-
   const hand = state.hands[playerIndex];
-  const { cardId, chosenColor, uno } = data || {};
+  const { cardId, chosenColor, uno, challengeResponse } = data || {};
+
+  // ---- +4 Challenge response (must resolve before any other move) ----
+  // When a +4 is pending, the turn belongs to the challenge target — not the
+  // player recorded in state.currentPlayer (which still points at the +4
+  // player). Handle this first so the target can act.
+  if (challengeResponse) {
+    const ch = state.pendingChallenge;
+    if (!ch) return 'uno_no_challenge_pending';
+    if (playerIndex !== ch.target) return 'g_not_your_turn';
+
+    if (challengeResponse === 'accept') {
+      // Target draws 4 and is skipped (normal +4 effect).
+      drawCards(state.hands[ch.target], 4, state);
+      state.currentPlayer = nextPlayerFrom(state, ch.target); // skip the target
+    } else if (challengeResponse === 'challenge') {
+      // Reveal: did the +4 player hold any card matching the prior color?
+      const hadMatch = ch.handSnapshot.some(function(c) { return c.color === ch.priorColor; });
+      if (hadMatch) {
+        // Challenge succeeds -> the +4 player drew illegally, they draw 4.
+        drawCards(state.hands[ch.by], 4, state);
+        state.currentPlayer = ch.target; // turn passes to the challenger
+      } else {
+        // Challenge fails -> challenger draws 6 (4 + 2 penalty).
+        drawCards(state.hands[ch.target], 6, state);
+        state.currentPlayer = nextPlayerFrom(state, ch.target); // skip the challenger
+      }
+    }
+    state.pendingChallenge = null;
+    state.drawStack = 0;
+    return null;
+  }
+
+  if (playerIndex !== state.currentPlayer) return 'g_not_your_turn';
 
   // ---- UNO call ----
   if (uno) {
@@ -124,7 +163,7 @@ exports.handleMove = (data, state, playerIndex) => {
       state.currentPlayer = nextPlayer(state);
       return null;
     }
-    // Check if player has playable cards
+    // Official rule: may only draw when holding no playable card.
     const hasPlayable = hand.some(c => canPlay(c, state));
     if (hasPlayable) return 'uno_have_playable_card';
     drawCards(hand, 1, state);
@@ -147,6 +186,11 @@ exports.handleMove = (data, state, playerIndex) => {
 
   if (state.drawStack > 0 && card.value !== '+2' && card.value !== '+4') return 'uno_must_draw_or_play';
   if (!canPlay(card, state) && state.drawStack === 0) return 'uno_cannot_play_card';
+
+  // Snapshot the hand BEFORE removing the card, so a later +4 challenge can
+  // check whether the player actually held a matching-color card.
+  var challengeSnapshot = (card.value === '+4') ? hand.map(function(c) { return { id: c.id, color: c.color, value: c.value }; }) : null;
+  var priorColor = state.currentColor;
 
   hand.splice(cardIdx, 1);
 
@@ -178,7 +222,8 @@ exports.handleMove = (data, state, playerIndex) => {
       state.drawStack += 2;
       break;
     case '+4':
-      state.drawStack += 4;
+      // Penalty is not applied immediately — the target must first respond to
+      // the challenge window (draw 4 or challenge). See challengeResponse above.
       break;
     case 'wild':
       break;
@@ -187,6 +232,18 @@ exports.handleMove = (data, state, playerIndex) => {
   }
 
   state.currentColor = card.color === 'wild' ? (chosenColor || 'red') : card.color;
+
+  if (card.value === '+4') {
+    // Hold the turn: the next player must accept the draw or challenge.
+    state.pendingChallenge = {
+      by: playerIndex,
+      target: nextPlayer(state),
+      handSnapshot: challengeSnapshot,
+      priorColor: priorColor,
+      chosenColor: chosenColor,
+    };
+    return null;
+  }
 
   if (card.value !== 'skip' && card.value !== 'reverse') {
     state.currentPlayer = nextPlayer(state);

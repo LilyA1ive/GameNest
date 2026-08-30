@@ -32,7 +32,7 @@
   <main class="game-page-shell">
     <header class="game-topbar">
       <div class="game-topbar-main">
-        <button class="back-btn" onclick="window._leaveRoom && window._leaveRoom()">返回大厅</button>
+        <button class="back-btn" onclick="window.doLeaveRoom && window.doLeaveRoom()">返回大厅</button>
         <div class="game-title-stack">
           <strong id="activeGameName">房间</strong>
           <span id="activeGameSubtitle">等待玩家加入</span>
@@ -131,7 +131,6 @@
   </div>
 
   <script src="/js/style-utils.js"></script>
-  <script src="/js/action-registry.js"></script>
   <script src="/js/lang/zh.js"></script>
   <script src="/js/lang/en.js"></script>
   <script src="/js/lang/catalog-zh.js"></script>
@@ -145,11 +144,14 @@
   <script src="/js/renderers/exploding-kittens.js"></script>
   <script src="/js/renderers/rummikub.js"></script>
   <script src="/js/renderers/twentyfour.js"></script>
+  <script src="/js/renderers/sudoku.js"></script>
+  <script src="/js/renderers/2048.js"></script>
   <script src="/js/renderers/minesweeper.js"></script>
   <script src="/js/renderers/numberbomb.js"></script>
   <script src="/js/renderers/oldmaid.js"></script>
   <script src="/js/renderers/liarsbar.js"></script>
   <script src="/js/renderers/bigtwo.js"></script>
+  <script src="/js/renderers/mahjong.js"></script>
   <script src="/js/renderers/texas.js"></script>
   <script src="/js/renderers/flightchess.js"></script>
   <script src="/js/renderers/snakebattle.js"></script>
@@ -166,6 +168,8 @@
   <script src="/js/renderers/truthdare.js"></script>
   <script src="/js/renderers/drawguess.js"></script>
   <script src="/js/renderers/battleship.js"></script>
+  <script src="/js/renderers/mahjong-cantonese.js"></script>
+  <script src="/js/renderers/sanguosha.js"></script>
   <script src="/js/game-catalog.js"></script>
   <script src="/js/room-client.js"></script>
 </body>

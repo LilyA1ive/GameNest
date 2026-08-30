@@ -6,8 +6,8 @@
   var _state = null;
   var _selTarget = -1;
   var _selTileIdx = -1;
-  var _selColor = 'white';
   var _selNum = 0;
+  var _selJoker = false;
   var _cssAdded = false;
 
   function addStyles() {
@@ -25,9 +25,9 @@
 '.dv-tile:active{transform:scale(.94);}' +
 '.dv-tile-white{background:linear-gradient(145deg,#fafafa,#e8e8e8);color:#333;border:1px solid #ddd;box-shadow:0 1px 3px rgba(0,0,0,.08);}' +
 '.dv-tile-black{background:linear-gradient(145deg,#444,#222);color:#fff;border:1px solid #555;box-shadow:0 1px 3px rgba(0,0,0,.25);}' +
-'.dv-tile-joker{background:linear-gradient(145deg,#c8a45c,#a8863a);color:#fff;border:2px solid #d4b88c;box-shadow:0 1px 6px rgba(200,164,92,.4);}' +
 '.dv-tile-hidden{background:linear-gradient(145deg,#666,#444);color:#fff;border:1px solid #777;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.2);}' +
 '.dv-tile-hidden:hover,.dv-tile-hidden:active{background:linear-gradient(145deg,#777,#555);}' +
+'.dv-tile-revealed-self{box-shadow:0 0 0 2px #3498db,0 0 6px rgba(52,152,219,.4);}' +
 '.dv-tile-color{font-size:9px;text-transform:uppercase;opacity:.7;line-height:1;}' +
 '.dv-tile-num{font-size:22px;font-weight:800;line-height:1;margin-top:2px;}' +
 '.dv-drawn{text-align:center;padding:10px;background:var(--accent-dim);border-radius:16px;}' +
@@ -47,13 +47,13 @@
 '.dv-color-btn.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}' +
 '.dv-color-white{background:#f5f5f5;color:#333;}' +
 '.dv-color-black{background:#333;color:#fff;}' +
-'.dv-color-joker{background:linear-gradient(145deg,#c8a45c,#a8863a);color:#fff;}' +
 '.dv-num-row{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-bottom:10px;}' +
 '.dv-num-btn{width:32px;height:40px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:14px;font-weight:600;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center;}' +
 '.dv-num-btn:active{transform:scale(.9);}' +
 '.dv-num-btn.selected{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 0 1px var(--accent);}' +
 '.dv-guess-actions{display:flex;gap:8px;}' +
-'.dv-draw-btn{width:100%;}' +
+'.dv-draw-btn{align-self:center;padding:6px 18px;font-size:13px;}' +
+'.dv-place-btn{width:32px;height:64px;border:2px dashed var(--accent);border-radius:6px;background:var(--bg);cursor:pointer;font-weight:700;font-size:18px;color:var(--accent);display:flex;align-items:center;justify-content:center;}' +
 '.dv-status{text-align:center;font-size:14px;color:var(--text-muted);padding:4px 0;min-height:22px;}' +
 '.dv-target-info{text-align:center;font-size:14px;font-weight:500;margin-bottom:8px;color:var(--accent);}' +
 '.dv-penalty-msg{text-align:center;font-size:15px;font-weight:700;color:#e74c3c;padding:8px 0;}' +
@@ -61,13 +61,20 @@
   }
 
   function tileClass(tile) {
-    if (tile.wild) return 'dv-tile-joker';
+    // Jokers keep their black/white color (no gold)
     return tile.color === 'white' ? 'dv-tile-white' : 'dv-tile-black';
   }
 
   function tileLabel(tile) {
-    if (tile.wild) return '<span class="dv-tile-color">★</span><span class="dv-tile-num" style="font-size:18px">★</span>';
+    // Own tiles: show color + number (or ★ for joker). Owner sees the color of their joker.
+    if (tile.wild) return '<span class="dv-tile-color">' + tile.color[0].toUpperCase() + '</span><span class="dv-tile-num" style="font-size:18px">★</span>';
     return '<span class="dv-tile-color">' + tile.color[0].toUpperCase() + '</span><span class="dv-tile-num">' + tile.num + '</span>';
+  }
+
+  // Opponent tile: color public, number hidden (show "?").
+  // Jokers are indistinguishable from normal tiles — only color + "?" visible.
+  function tileLabelHiddenNum(tile) {
+    return '<span class="dv-tile-color">' + tile.color[0].toUpperCase() + '</span><span class="dv-tile-num">?</span>';
   }
 
   function buildPlayersUI(state, playerIndex) {
@@ -80,7 +87,7 @@
     for (var p = 0; p < state.tiles.length; p++) {
       (function(pIdx) {
         var tiles = state.tiles[pIdx];
-        var rev = state.revealed && state.revealed[pIdx];
+        var rev = state.numRevealed && state.numRevealed[pIdx];
         var elim = state.eliminated && state.eliminated[pIdx];
         var isMe = pIdx === playerIndex;
 
@@ -103,12 +110,28 @@
             var tileEl = document.createElement('div');
             tileEl.className = 'dv-tile';
 
-            if (isMe || isRev) {
-              tileEl.classList.add(tileClass(tile));
+            if (isMe) {
+              // Own tiles: color + number always visible; jokers show color + ★ (not gold)
+              if (tile.wild) {
+                tileEl.classList.add(tile.color === 'white' ? 'dv-tile-white' : 'dv-tile-black');
+              } else {
+                tileEl.classList.add(tileClass(tile));
+              }
+              // Highlight tiles that have been revealed (visible to others)
+              if (isRev) tileEl.classList.add('dv-tile-revealed-self');
+              tileEl.innerHTML = tileLabel(tile);
+            } else if (isRev) {
+              // Opponent tile with number revealed: jokers keep color + ★ (no gold)
+              if (tile.wild) {
+                tileEl.classList.add(tile.color === 'white' ? 'dv-tile-white' : 'dv-tile-black');
+              } else {
+                tileEl.classList.add(tileClass(tile));
+              }
               tileEl.innerHTML = tileLabel(tile);
             } else {
-              tileEl.classList.add('dv-tile-hidden');
-              tileEl.textContent = '?';
+              // Opponent tile: color PUBLIC, number hidden, joker looks like normal tile
+              tileEl.classList.add(tile.color === 'white' ? 'dv-tile-white' : 'dv-tile-black');
+              tileEl.innerHTML = tileLabelHiddenNum(tile);
               tileEl.addEventListener('click', function() {
                 if (state.currentPlayer !== playerIndex) return;
                 if (state.phase !== 'guess') return;
@@ -121,13 +144,8 @@
             // Penalty phase: own unrevealed tiles become clickable
             if (isMe && !isRev && inPenalty) {
               tileEl.style.cursor = 'pointer';
-              if (tile.wild) {
-                tileEl.classList.add('dv-tile-joker');
-                tileEl.innerHTML = tileLabel(tile);
-              } else {
-                tileEl.classList.add(tileClass(tile));
-                tileEl.innerHTML = tileLabel(tile);
-              }
+              tileEl.classList.add(tileClass(tile));
+              tileEl.innerHTML = tileLabel(tile);
               tileEl.addEventListener('click', function() {
                 window.makeGameMove({ revealIndex: tIdx });
               });
@@ -196,12 +214,12 @@
         targetInfo.textContent = _t('dv_select_target_hint');
       }
 
-      // Tile grid for target
+      // Tile grid for target (color public, number hidden unless revealed)
       if (_selTarget >= 0 && _selTarget < state.tiles.length) {
         var tileGrid = document.getElementById('dvGuessGrid');
         tileGrid.innerHTML = '';
         var tgtTiles = state.tiles[_selTarget];
-        var tgtRev = state.revealed[_selTarget];
+        var tgtRev = state.numRevealed[_selTarget];
 
         for (var tg = 0; tg < tgtTiles.length; tg++) {
           (function(tgIdx) {
@@ -210,11 +228,12 @@
             gTile.className = 'dv-guess-grid-tile';
             if (isRev) {
               gTile.classList.add('revealed');
-              gTile.classList.add(tileClass(tgtTiles[tgIdx]));
-              gTile.innerHTML = tileLabel(tgtTiles[tgIdx]);
+              const tt = tgtTiles[tgIdx];
+              gTile.classList.add(tt.wild ? (tt.color === 'white' ? 'dv-tile-white' : 'dv-tile-black') : tileClass(tt));
+              gTile.innerHTML = tileLabel(tt);
             } else {
-              gTile.classList.add('hidden');
-              gTile.textContent = '?';
+              gTile.classList.add(tgtTiles[tgIdx].color === 'white' ? 'dv-tile-white' : 'dv-tile-black');
+              gTile.innerHTML = tileLabelHiddenNum(tgtTiles[tgIdx]);
               if (tgIdx === _selTileIdx) gTile.classList.add('selected');
               gTile.addEventListener('click', function() {
                 _selTileIdx = tgIdx;
@@ -268,12 +287,12 @@
         : allTiles;
       var html = '';
 
-      html += '<button style="width:24px;height:64px;border:2px dashed var(--accent);border-radius:6px;background:var(--bg);cursor:pointer;font-weight:700;color:var(--accent);" onclick="window.makeGameMove({placeIndex:0})">←</button>';
+      html += '<button class="dv-place-btn" onclick="window.makeGameMove({placeIndex:0})">←</button>';
 
       for (var t = 0; t < tiles.length; t++) {
         var tile = tiles[t];
         html += '<div class="dv-tile ' + tileClass(tile) + '" style="width:46px;height:64px;">' + tileLabel(tile) + '</div>';
-        html += '<button style="width:24px;height:64px;border:2px dashed var(--accent);border-radius:6px;background:var(--bg);cursor:pointer;font-weight:700;color:var(--accent);" onclick="window.makeGameMove({placeIndex:' + (t + 1) + '})">→</button>';
+        html += '<button class="dv-place-btn" onclick="window.makeGameMove({placeIndex:' + (t + 1) + '})">→</button>';
       }
 
       slotsDiv.innerHTML = html;
@@ -297,9 +316,20 @@
         statusEl.textContent = _t('dv_waiting_init_place');
       }
     } else if (state.lastGuessResult && state.lastGuessResult.correct) {
-      statusEl.textContent = _t('dv_guess_correct');
+      if (state.lastGuessResult.guesser === playerIndex) {
+        statusEl.textContent = _t('dv_guess_correct');                       // you guessed right
+      } else if (state.lastGuessResult.targetPlayer === playerIndex) {
+        var cnt = state.guessCount ? state.guessCount[playerIndex] : 0;
+        statusEl.textContent = _tf('dv_your_tile_guessed', cnt);             // your tile was guessed (with count)
+      } else {
+        statusEl.textContent = _tf('dv_tile_guessed', (window.getPlayerName ? window.getPlayerName(state.lastGuessResult.targetPlayer) : (_t('dv_player_fallback') + (state.lastGuessResult.targetPlayer + 1))));
+      }
     } else if (state.lastGuessResult && !state.lastGuessResult.correct) {
-      statusEl.textContent = _t('dv_guess_wrong');
+      if (state.lastGuessResult.guesser === playerIndex) {
+        statusEl.textContent = _t('dv_guess_wrong');                          // you guessed wrong
+      } else {
+        statusEl.textContent = _tf('dv_guess_failed', (window.getPlayerName ? window.getPlayerName(state.lastGuessResult.guesser) : (_t('dv_player_fallback') + (state.lastGuessResult.guesser + 1))));
+      }
     } else if (state.currentPlayer === playerIndex) {
       if (state.phase === 'place') statusEl.textContent = _t('dv_place_joker');
       else if (state.phase === 'guess') statusEl.textContent = _t('dv_guess_or_pass');
@@ -319,7 +349,7 @@
       if (tileGrid) {
         tileGrid.innerHTML = '';
         var tgtTiles = state.tiles[_selTarget];
-        var tgtRev = state.revealed[_selTarget];
+        var tgtRev = state.numRevealed[_selTarget];
         for (var tg = 0; tg < tgtTiles.length; tg++) {
           (function(tgIdx) {
             var gTile = document.createElement('div');
@@ -327,11 +357,12 @@
             gTile.className = 'dv-guess-grid-tile';
             if (isRev) {
               gTile.classList.add('revealed');
-              gTile.classList.add(tileClass(tgtTiles[tgIdx]));
-              gTile.innerHTML = tileLabel(tgtTiles[tgIdx]);
+              const tt = tgtTiles[tgIdx];
+              gTile.classList.add(tt.wild ? (tt.color === 'white' ? 'dv-tile-white' : 'dv-tile-black') : tileClass(tt));
+              gTile.innerHTML = tileLabel(tt);
             } else {
-              gTile.classList.add('hidden');
-              gTile.textContent = '?';
+              gTile.classList.add(tgtTiles[tgIdx].color === 'white' ? 'dv-tile-white' : 'dv-tile-black');
+              gTile.innerHTML = tileLabelHiddenNum(tgtTiles[tgIdx]);
               if (tgIdx === _selTileIdx) gTile.classList.add('selected');
               gTile.addEventListener('click', function() {
                 _selTileIdx = tgIdx;
@@ -372,8 +403,8 @@
       _state = null;
       _selTarget = -1;
       _selTileIdx = -1;
-      _selColor = 'white';
       _selNum = 0;
+      _selJoker = false;
       addStyles();
 
       container.innerHTML =
@@ -393,14 +424,10 @@
     '<div class="dv-guess-title">' + _t('dv_guess_title') + '</div>' +
     '<div class="dv-target-info" id="dvTargetInfo">' + _t('dv_select_target_hint') + '</div>' +
     '<div class="dv-guess-tile-grid" id="dvGuessGrid"></div>' +
-    '<div class="dv-color-row">' +
-      '<button class="dv-color-btn dv-color-white selected" id="dvCw">' + _t('dv_white') + '</button>' +
-      '<button class="dv-color-btn dv-color-black" id="dvCb">' + _t('dv_black') + '</button>' +
-      '<button class="dv-color-btn dv-color-joker" id="dvCj">' + _t('dv_joker') + '</button>' +
-    '</div>' +
     '<div class="dv-num-row" id="dvNumRow"></div>' +
     '<div class="dv-guess-actions">' +
       '<button class="btn btn-primary btn-sm" id="dvGuessBtn">' + _t('dv_guess_btn') + '</button>' +
+      '<button class="btn btn-warning btn-sm" id="dvGuessJokerBtn">' + _t('dv_guess_joker') + '</button>' +
       '<button class="btn btn-outline btn-sm" id="dvPassBtn">' + _t('dv_pass') + '</button>' +
     '</div>' +
   '</div>' +
@@ -412,29 +439,7 @@
         window.makeGameMove({});
       });
 
-      // Color buttons
-      document.getElementById('dvCw').addEventListener('click', function() {
-        document.getElementById('dvCw').classList.add('selected');
-        document.getElementById('dvCb').classList.remove('selected');
-        document.getElementById('dvCj').classList.remove('selected');
-        _selColor = 'white';
-      });
-      document.getElementById('dvCb').addEventListener('click', function() {
-        document.getElementById('dvCb').classList.add('selected');
-        document.getElementById('dvCw').classList.remove('selected');
-        document.getElementById('dvCj').classList.remove('selected');
-        _selColor = 'black';
-      });
-      document.getElementById('dvCj').addEventListener('click', function() {
-        document.getElementById('dvCj').classList.add('selected');
-        document.getElementById('dvCw').classList.remove('selected');
-        document.getElementById('dvCb').classList.remove('selected');
-        _selColor = 'joker';
-        _selNum = -1;
-        document.querySelectorAll('.dv-num-btn').forEach(function(b) { b.classList.remove('selected'); });
-      });
-
-      // Number buttons (0-11), hide when joker selected
+      // Number buttons (0-11)
       var numRow = document.getElementById('dvNumRow');
       for (var n = 0; n <= 11; n++) {
         (function(nVal) {
@@ -442,23 +447,33 @@
           btn.className = 'dv-num-btn' + (nVal === 0 ? ' selected' : '');
           btn.textContent = nVal;
           btn.addEventListener('click', function() {
-            document.getElementById('dvCj').classList.remove('selected');
             document.querySelectorAll('.dv-num-btn').forEach(function(b) { b.classList.remove('selected'); });
             this.classList.add('selected');
             _selNum = nVal;
+            _selJoker = false;
           });
           numRow.appendChild(btn);
         })(n);
       }
 
-      // Guess button
+      // Guess number button (continueGuess: true lets player keep guessing after correct)
       document.getElementById('dvGuessBtn').addEventListener('click', function() {
         if (_selTarget < 0 || _selTileIdx < 0) return;
         window.makeGameMove({
           targetPlayer: _selTarget,
           tileIndex: _selTileIdx,
-          guessColor: _selColor,
-          guessNum: _selColor === 'joker' ? -1 : _selNum,
+          guessNum: _selNum,
+          continueGuess: true,
+        });
+      });
+
+      // Guess joker button
+      document.getElementById('dvGuessJokerBtn').addEventListener('click', function() {
+        if (_selTarget < 0 || _selTileIdx < 0) return;
+        window.makeGameMove({
+          targetPlayer: _selTarget,
+          tileIndex: _selTileIdx,
+          guessJoker: true,
           continueGuess: true,
         });
       });

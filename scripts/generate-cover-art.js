@@ -42,6 +42,10 @@ const covers = [
   { id: 'hearts', palette: ['#f5e8e8', '#e8a0a0', '#c23030', '#1a0a0a'], motif: 'hearts' },
   { id: 'truthdare', palette: ['#f2e8f0', '#d4a0c8', '#8a3070', '#1a1020'], motif: 'truthdare' },
   { id: 'battleship', palette: ['#e8eef4', '#7cafc2', '#2a6f8a', '#142a35'], motif: 'battleship' },
+  { id: '2048', palette: ['#f5f1e8', '#d9cbb0', '#edc22e', '#2a2418'], motif: '2048' },
+  { id: 'sudoku', palette: ['#f2f0ea', '#c9d4de', '#6d8fb0', '#182231'], motif: 'sudoku' },
+  { id: 'mahjong-sichuan', palette: ['#f4efe7', '#c7d0c6', '#2f7a55', '#14231a'], motif: 'mahjong' },
+  { id: 'sanguosha', palette: ['#f2e8df', '#d1b698', '#b0543c', '#1e130c'], motif: 'sanguosha' },
 ];
 
 function ensureDir(dirPath) {
@@ -380,6 +384,55 @@ function motifSvg(cover) {
         <line x1="1270" y1="450" x2="1250" y2="470" stroke="#c62828" stroke-width="6" stroke-linecap="round"/>
         ${circle(1310, 510, 8, '#90a4ae')}
       `;
+    case '2048':
+      return `
+        ${block(910, 250, 190, 190, 12, '#eee4da')}
+        ${block(1110, 250, 190, 190, 12, '#ede0c8')}
+        ${block(1310, 250, 190, 190, 12, '#f2b179')}
+        ${block(910, 450, 190, 190, 12, '#ede0c8')}
+        ${block(1110, 450, 190, 190, 12, '#f67c5f')}
+        ${block(1310, 450, 190, 190, 12, '#edc22e')}
+        ${block(910, 650, 190, 190, 12, '#f2b179')}
+        ${block(1110, 650, 190, 190, 12, '#edc22e')}
+        ${block(1310, 650, 190, 190, 12, '#f65e3b')}
+        <text x="1065" y="430" font-family="Arial" font-size="120" font-weight="bold" fill="#776e65" text-anchor="middle">2</text>
+        <text x="1205" y="640" font-family="Arial" font-size="80" font-weight="bold" fill="#f9f6f2" text-anchor="middle">0</text>
+        <text x="1400" y="840" font-family="Arial" font-size="70" font-weight="bold" fill="#f9f6f2" text-anchor="middle">4</text>
+        <text x="1005" y="700" font-family="Arial" font-size="60" font-weight="bold" fill="#776e65" text-anchor="middle">8</text>
+      `;
+    case 'sudoku':
+      return `
+        ${block(900, 220, 500, 500, 26, '#f7f9fb', 0.9)}
+        ${block(910, 230, 280, 480, 16, '#fff', 0.7)}
+        ${block(1190, 230, 280, 480, 16, '#fff', 0.7)}
+        ${block(1050, 230, 300, 480, 16, '#fff', 0.7)}
+        ${Array.from({ length: 4 }, (_, i) => line(1030 + i * 80, 230, 1030 + i * 80, 700, accent, 6, 0.4)).join('')}
+        ${Array.from({ length: 4 }, (_, i) => line(910, 350 + i * 115, 1380, 350 + i * 115, accent, 6, 0.4)).join('')}
+        ${circle(950, 270, 22, dark, 0.6)}
+        ${circle(1110, 385, 22, dark, 0.45)}
+        ${circle(1270, 500, 22, '#c62828', 0.7)}
+        ${circle(1190, 615, 22, dark, 0.5)}
+      `;
+    case 'mahjong':
+      return `
+        ${block(930, 260, 130, 190, 18, '#fff8ef')}
+        ${block(1070, 260, 130, 190, 18, '#fff8ef')}
+        ${block(1210, 260, 130, 190, 18, '#f5e9d0')}
+        ${block(1000, 470, 130, 190, 18, '#f5e9d0')}
+        ${block(1140, 470, 130, 190, 18, '#fff8ef')}
+        ${block(1280, 470, 130, 190, 18, '#e8f0e9')}
+        ${block(1070, 680, 130, 190, 18, '#fff8ef')}
+        ${block(1210, 680, 130, 190, 18, '#f5e9d0')}
+        ${circle(1135, 360, 30, accent, 0.85)}
+        ${circle(1215, 800, 26, dark, 0.6)}
+      `;
+    case 'sanguosha':
+      return `
+        <g transform="rotate(-16 1130 460)">${block(1010, 300, 200, 320, 24, '#fff6ec')}</g>
+        <g transform="rotate(8 1210 420)">${block(1100, 260, 200, 320, 24, '#b0543c', 0.92)}</g>
+        <g transform="rotate(22 1300 480)">${block(1200, 320, 200, 320, 24, '#2f6a4a', 0.9)}</g>
+        ${circle(1155, 700, 66, '#fff', 0.94)}
+      `;
     default:
       return '';
   }
@@ -457,7 +510,11 @@ function main() {
   ensureDir(outDir);
   ensureDir(tempDir);
 
-  for (const cover of covers) {
+  // Optional: `node scripts/generate-cover-art.js <id> [<id> ...]` renders only those covers.
+  const onlyIds = process.argv.slice(2).filter((a) => !a.startsWith('-'));
+  const toRender = onlyIds.length ? covers.filter((c) => onlyIds.includes(c.id)) : covers;
+
+  for (const cover of toRender) {
     writeSvgAndRenderPng(cover, browserPath);
     // Also write any custom variant filenames referenced by game-catalog.js
     const variant = variantMap[cover.id];
@@ -470,7 +527,7 @@ function main() {
     }
   }
 
-  console.log(`Generated ${covers.length} bitmap cover assets in ${outDir}`);
+  console.log(`Generated ${toRender.length} bitmap cover assets in ${outDir}`);
 }
 
 main();

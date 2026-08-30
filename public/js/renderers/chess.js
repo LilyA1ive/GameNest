@@ -375,7 +375,7 @@
     }
 
     // === Status bar ===
-    var sy = margin + boardH + 30;
+    var sy = margin + boardH + 55;
     ctx.fillStyle = '#3a3028'; ctx.font = 'bold 16px system-ui,-apple-system,sans-serif'; ctx.textAlign = 'center';
     var pi = parseInt(sessionStorage.getItem('playerIndex'));
     if (state.winner != null) {
@@ -417,7 +417,7 @@
         var dpr = window.devicePixelRatio || 1;
         cs = (W - 30) / COLS;
         margin = 30 + cs * 0.5;
-        var H = margin * 2 + cs * (ROWS - 1);
+        var H = margin * 2 + cs * (ROWS - 1) + 40;
         canvas.width = W * dpr; canvas.height = H * dpr;
         canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(dpr, dpr);

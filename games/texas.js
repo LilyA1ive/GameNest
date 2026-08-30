@@ -433,10 +433,11 @@ exports.handleMove = (data, state, playerIndex) => {
     }
     if (amount > state.chips[playerIndex]) return 'tx_not_enough_chips';
 
-    state.chips[playerIndex] -= (amount - state.bets[playerIndex]);
+    const raiseSize = amount - state.bets[playerIndex];
+    state.chips[playerIndex] -= raiseSize;
     state.bets[playerIndex] = amount;
     state.currentBet = amount;
-    state.lastRaise = amount - state.bets[playerIndex]; // simplified
+    state.lastRaise = raiseSize;
 
     state.currentPlayer = nextActivePlayer(state, playerIndex);
     return null;

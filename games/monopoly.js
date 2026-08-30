@@ -2,8 +2,7 @@
 exports.name = 'monopoly';
 exports.maxPlayers = 6;
 
-function _t(state, zh, en) { return state && state._lang === 'en' ? (en || zh) : zh; }
-
+const { pick: _t } = require('./lib/i18n');
 const JAIL_INDEX = 7;
 const BOARD = buildBoard();
 

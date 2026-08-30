@@ -2,7 +2,7 @@
 // 达芬奇密码 - 2-4 player logic deduction game. Guess opponent hidden numbered tiles.
 
 exports.name = 'davinci';
-exports.maxPlayers = 6;
+exports.maxPlayers = 4;
 
 function createTilePool() {
   const pool = [];
@@ -11,9 +11,10 @@ function createTilePool() {
     pool.push({ color: 'black', num: i, id: 'b' + i });
     pool.push({ color: 'white', num: i, id: 'w' + i });
   }
-  // Joker/wild tiles (万能牌)
-  pool.push({ color: 'joker', num: -1, id: 'joker-0', wild: true });
-  pool.push({ color: 'joker', num: -1, id: 'joker-1', wild: true });
+  // Joker/wild tiles (万能牌): colored black/white so opponents cannot tell them
+  // apart from normal tiles — only the hidden "wild" flag distinguishes them.
+  pool.push({ color: 'black', num: -1, id: 'joker-0', wild: true });
+  pool.push({ color: 'white', num: -1, id: 'joker-1', wild: true });
   // shuffle
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -71,17 +72,18 @@ function sortTilesLocked(tiles, revealed) {
 }
 
 exports.createState = () => ({
-  tiles: [],           // per-player: [{color, num}, ...]
-  revealed: [],        // per-player: [bool, ...]
+  tiles: [],           // per-player: [{color, num, id, wild?, locked?}, ...]
+  numRevealed: [],     // per-player: [bool, ...] — number revealed (color always public)
   pool: [],            // remaining draw tiles
   currentPlayer: 0,
-  phase: 'draw',       // 'draw' | 'guess' | 'penalty' | 'over'
+  phase: 'draw',       // 'draw' | 'guess' | 'penalty' | 'over' | 'place' | 'init_place'
   drawnTile: null,     // tile just drawn (player can see it)
   penaltyPlayer: null, // player who must reveal a tile
   winner: null,
   playerCount: 0,
   eliminated: [],      // per-player: bool
-  lastGuessResult: null, // { correct, targetPlayer, tileIndex, guessColor, guessNum }
+  guessCount: [],      // per-player: how many of their tiles have been guessed correctly
+  lastGuessResult: null, // { correct, guesser, targetPlayer, tileIndex, numRevealedCnt, guessNum, guessJoker, tile }
   initJokerQueue: [],    // [{playerIdx, jokerTileId}] — players who need to place initial jokers
 });
 
@@ -89,14 +91,16 @@ function initGame(state, playerCount) {
   state.playerCount = playerCount;
   state.pool = createTilePool();
   state.tiles = [];
-  state.revealed = [];
+  state.numRevealed = [];
   state.eliminated = Array(playerCount).fill(false);
-  const count = playerCount <= 2 ? 5 : 4;
+  state.guessCount = Array(playerCount).fill(0);
+  // Real rules: 2-3 players → 4 tiles each; 4 players → 3 tiles each
+  const count = playerCount <= 3 ? 4 : 3;
   for (let i = 0; i < playerCount; i++) {
     const tiles = state.pool.splice(0, count);
     sortTiles(tiles);
     state.tiles[i] = tiles;
-    state.revealed[i] = Array(count).fill(false);
+    state.numRevealed[i] = Array(count).fill(false);
   }
   state.currentPlayer = 0;
   state.phase = 'draw';
@@ -162,7 +166,7 @@ exports.handleMove = (data, state, playerIndex) => {
     if (typeof placeIndex !== 'number') return 'dv_choose_joker_position';
 
     const tiles = state.tiles[playerIdx];
-    const rev = state.revealed[playerIdx];
+    const rev = state.numRevealed[playerIdx];
 
     // Remove the joker from its current position (sorted to end by initGame)
     const jokerIdx = tiles.findIndex(t => t.id === jokerTileId);
@@ -194,22 +198,21 @@ exports.handleMove = (data, state, playerIndex) => {
     const { revealIndex } = data || {};
 
     const tiles = state.tiles[playerIndex];
-    const rev = state.revealed[playerIndex];
+    const rev = state.numRevealed[playerIndex];
 
     // Handle drawn tile that hasn't been inserted yet
     if (state.drawnTile) {
-      // If player chose a specific tile to reveal, reveal it first (index is
-      // still valid against the current arrays before we add the drawn tile).
+      // If player chose a specific tile to reveal its number, reveal it first
       if (typeof revealIndex === 'number' && revealIndex >= 0 && revealIndex < tiles.length) {
         rev[revealIndex] = true;
       }
-      // Add the drawn tile face-up, then re-sort keeping locked jokers fixed.
+      // Add the drawn tile with its number revealed, then re-sort keeping locked jokers fixed.
       tiles.push(state.drawnTile);
       rev.push(true);
       sortTilesLocked(tiles, rev);
       state.drawnTile = null;
     } else {
-      // No drawn tile: just reveal chosen tile
+      // No drawn tile: just reveal chosen tile's number
       if (typeof revealIndex === 'number' && revealIndex >= 0 && revealIndex < tiles.length) {
         rev[revealIndex] = true;
       }
@@ -244,9 +247,9 @@ exports.handleMove = (data, state, playerIndex) => {
     if (typeof placeIndex !== 'number') return 'dv_choose_joker_position';
 
     const tiles = state.tiles[playerIndex];
-    const rev = state.revealed[playerIndex];
+    const rev = state.numRevealed[playerIndex];
 
-    // Insert at chosen position. The joker stays hidden (opponents must still
+    // Insert at chosen position. The joker's number stays hidden (opponents must still
     // guess it) and is marked `locked` so later re-sorts never move it again.
     if (placeIndex < 0 || placeIndex > tiles.length) return 'dv_invalid_position';
     state.drawnTile.locked = true;
@@ -264,16 +267,17 @@ exports.handleMove = (data, state, playerIndex) => {
   }
 
   // ---- GUESS PHASE ----
+  // Color is always public; players guess only the NUMBER (or "joker").
   if (state.phase === 'guess') {
     if (playerIndex !== state.currentPlayer) return 'g_not_your_turn';
 
-    const { targetPlayer, tileIndex, guessColor, guessNum, pass } = data || {};
+    const { targetPlayer, tileIndex, guessNum, guessJoker, pass } = data || {};
 
     if (pass) {
-      // Pass — place drawn tile face-down in own sequence (keep locked jokers fixed)
+      // Pass — place drawn tile with number hidden in own sequence (keep locked jokers fixed)
       if (state.drawnTile) {
         const tiles = state.tiles[playerIndex];
-        const rev = state.revealed[playerIndex];
+        const rev = state.numRevealed[playerIndex];
         tiles.push(state.drawnTile);
         rev.push(false);
         sortTilesLocked(tiles, rev);
@@ -290,50 +294,81 @@ exports.handleMove = (data, state, playerIndex) => {
     if (targetPlayer < 0 || targetPlayer >= state.playerCount) return 'dv_invalid_target';
     if (state.eliminated[targetPlayer]) return 'dv_player_out';
     if (tileIndex < 0 || tileIndex >= state.tiles[targetPlayer].length) return 'dv_invalid_position';
-    if (state.revealed[targetPlayer][tileIndex]) return 'dv_card_already_revealed';
+    if (state.numRevealed[targetPlayer][tileIndex]) return 'dv_card_already_revealed';
 
     const tile = state.tiles[targetPlayer][tileIndex];
     if (!tile) return 'dv_no_card_there';
 
-    // Check guess: for jokers, only need to match color='joker'; for numbers, match color+num
-    const correct = tile.wild
-      ? (guessColor === 'joker')
-      : (tile.color === guessColor && tile.num === guessNum);
-
-    state.lastGuessResult = { correct, targetPlayer, tileIndex, guessColor, guessNum, tile };
+    // Check guess: for jokers, guessJoker must be true; for numbers, match num only (color is public)
+    let correct;
+    if (tile.wild) {
+      correct = !!guessJoker;
+    } else {
+      correct = (typeof guessNum === 'number') && (tile.num === guessNum);
+    }
 
     if (correct) {
-      // Correct guess! Reveal the tile. If all tiles revealed, player is eliminated.
-      state.revealed[targetPlayer][tileIndex] = true;
-      if (state.revealed[targetPlayer].every(r => r)) {
+      // Correct guess! Reveal the number and increment guess count.
+      state.numRevealed[targetPlayer][tileIndex] = true;
+      state.guessCount[targetPlayer] = (state.guessCount[targetPlayer] || 0) + 1;
+      const numRevealedCnt = state.numRevealed[targetPlayer].filter(Boolean).length;
+      if (state.numRevealed[targetPlayer].every(r => r)) {
         state.eliminated[targetPlayer] = true;
       }
-      // Continue guessing (continueGuess sent by frontend means they can guess again)
+      state.lastGuessResult = { correct: true, guesser: playerIndex, targetPlayer, tileIndex, numRevealedCnt, guessNum: guessNum || null, guessJoker: !!guessJoker, tile };
+      // Auto-check for game over after correct guess (no need to press pass)
+      if (activeCount(state) <= 1) { endGame(state); return null; }
+      // Player may continue guessing (continueGuess) or end turn (pass)
       if (data.continueGuess) return null;
       // No continueGuess — end turn
+      state.currentPlayer = nextActive(state, playerIndex);
+      state.phase = 'draw';
+      return null;
     } else {
-      // Wrong guess — drawn tile goes face-up, turn ends (no extra tile reveal)
+      // Wrong guess — place drawn tile face-DOWN (hidden), then enter penalty phase.
+      // The guesser must reveal one of their own hidden tiles before turn ends.
       const pTiles = state.tiles[playerIndex];
-      const pRev = state.revealed[playerIndex];
+      const pRev = state.numRevealed[playerIndex];
       if (state.drawnTile) {
         pTiles.push(state.drawnTile);
-        pRev.push(true);
+        pRev.push(false);  // drawn tile stays hidden
         sortTilesLocked(pTiles, pRev);
         state.drawnTile = null;
       }
-      state.lastGuessResult = null;
-      state.currentPlayer = nextActive(state, playerIndex);
-      state.phase = 'draw';
-      if (activeCount(state) <= 1) endGame(state);
+      state.lastGuessResult = { correct: false, guesser: playerIndex, targetPlayer, tileIndex, guessNum: guessNum || null, guessJoker: !!guessJoker, tile };
+      // Enter penalty phase: guesser reveals one of their own tiles
+      state.phase = 'penalty';
+      state.penaltyPlayer = playerIndex;
       return null;
     }
-
-    state.currentPlayer = nextActive(state, playerIndex);
-    state.phase = 'draw';
-    state.lastGuessResult = null;
-    if (activeCount(state) <= 1) endGame(state);
-    return null;
   }
 
   return 'g_unknown_action';
 };
+
+// playerView: color is always public; only the NUMBER is hidden from opponents.
+exports.playerView = function playerView(state, playerIndex) {
+  return Object.assign({}, state, {
+    tiles: state.tiles.map((tiles, i) => {
+      if (i === playerIndex) return tiles; // own tiles: full info
+      return tiles.map((t, j) => ({
+        color: t.color,                                    // color always public
+        wild: t.wild,
+        num: state.numRevealed[i][j] ? t.num : null,       // number hidden unless revealed
+        numRevealed: !!state.numRevealed[i][j],
+        id: t.id,
+        locked: t.locked,
+      }));
+    }),
+    // drawnTile is private: only the current player may see it
+    drawnTile: (state.currentPlayer === playerIndex) ? state.drawnTile : null,
+    guessCount: state.guessCount,
+    // lastGuessResult.tile contains the full tile; strip it for opponents to avoid leaking
+    lastGuessResult: state.lastGuessResult && Object.assign({}, state.lastGuessResult, {
+      tile: state.lastGuessResult.tile ? { color: state.lastGuessResult.tile.color, wild: state.lastGuessResult.tile.wild } : null,
+    }),
+  });
+};
+
+// Export sortTiles for testing
+exports.sortTiles = sortTiles;

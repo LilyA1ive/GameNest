@@ -53,11 +53,6 @@ function discardAllPairsWithLog(hand) {
   return discarded;
 }
 
-// backwards compat
-function discardAllPairs(hand) {
-  discardAllPairsWithLog(hand);
-}
-
 exports.createState = () => ({
   hands: [],
   handSizes: [],
@@ -104,13 +99,10 @@ exports.handleMove = function (data, state, playerIndex) {
   // Allow _ping — a no-op move to trigger UI re-render
   if (data && data._ping === true) return null;
 
-  const { drawFrom, cardIndex } = data || {};
+  const { cardIndex } = data || {};
 
-  // Validate drawFrom
-  if (typeof drawFrom !== 'number' || drawFrom < 0 || drawFrom >= state.hands.length) {
-    return 'om_choose_player';
-  }
-  if (drawFrom === playerIndex) return 'om_cannot_draw_self';
+  // Official rule: must draw from the player to your left (next in turn order).
+  const drawFrom = (playerIndex + 1) % state.hands.length;
   if (state.hands[drawFrom].length === 0) return 'om_player_no_cards';
 
   // Validate cardIndex — player picks a specific face-down card

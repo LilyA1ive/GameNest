@@ -5,18 +5,18 @@ exports.name = 'davinci';
 
 function deduceGuess(state, playerIndex, targetPlayer, tileIndex) {
   // Build known number sets from revealed tiles + own tiles
-  const known = { black: new Set(), white: new Set() };
+  const known = new Set();
   for (let p = 0; p < state.playerCount; p++) {
-    const tiles = state.tiles[p], rev = state.revealed[p];
+    const tiles = state.tiles[p], rev = state.numRevealed[p];
     for (let t = 0; t < tiles.length; t++) {
       if ((p === playerIndex || rev[t]) && !tiles[t].wild) {
-        known[tiles[t].color].add(tiles[t].num);
+        known.add(tiles[t].num);
       }
     }
   }
   // Determine range from revealed neighbors
   const tgtTiles = state.tiles[targetPlayer];
-  const tgtRev = state.revealed[targetPlayer];
+  const tgtRev = state.numRevealed[targetPlayer];
   let lo = -1, hi = 12;
   for (let t = 0; t < tgtTiles.length; t++) {
     if (tgtRev[t] && !tgtTiles[t].wild) {
@@ -24,20 +24,16 @@ function deduceGuess(state, playerIndex, targetPlayer, tileIndex) {
       if (t > tileIndex) hi = Math.min(hi, tgtTiles[t].num);
     }
   }
-  // Build candidate set
+  // Build candidate numbers (color is public, so guess number only)
   const candidates = [];
   for (let n = lo + 1; n < hi; n++) {
-    if (!known.black.has(n)) candidates.push({ guessColor: 'black', guessNum: n });
-    if (!known.white.has(n)) candidates.push({ guessColor: 'white', guessNum: n });
+    if (!known.has(n)) candidates.push(n);
   }
   // 20% chance of random "mistake" to feel human
   if (Math.random() < 0.2 || candidates.length === 0) {
-    return {
-      guessColor: Math.random() < 0.5 ? 'white' : 'black',
-      guessNum: Math.floor(Math.random() * 12),
-    };
+    return { guessNum: Math.floor(Math.random() * 12) };
   }
-  return candidates[Math.floor(Math.random() * candidates.length)];
+  return { guessNum: candidates[Math.floor(Math.random() * candidates.length)] };
 }
 
 exports.createBot = (playerIndex) => ({
@@ -70,12 +66,17 @@ exports.createBot = (playerIndex) => ({
       for (let i = 0; i < state.playerCount; i++) {
         if (i === playerIndex || state.eliminated[i]) continue;
         for (let j = 0; j < state.tiles[i].length; j++) {
-          if (!state.revealed[i][j]) opponents.push({ player: i, tileIndex: j });
+          if (!state.numRevealed[i][j]) opponents.push({ player: i, tileIndex: j });
         }
       }
       if (opponents.length === 0) return { pass: true };
 
       const target = opponents[Math.floor(Math.random() * opponents.length)];
+      // Color is public: if target tile is a joker, guess joker directly
+      const tgtTile = state.tiles[target.player][target.tileIndex];
+      if (tgtTile.wild) {
+        return { targetPlayer: target.player, tileIndex: target.tileIndex, guessJoker: true };
+      }
       const guess = deduceGuess(state, playerIndex, target.player, target.tileIndex);
       return { targetPlayer: target.player, tileIndex: target.tileIndex, ...guess };
     }

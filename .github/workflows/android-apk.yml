@@ -65,10 +65,11 @@ jobs:
           if command -v pwsh &> /dev/null; then
             pwsh android/copy-nodejs-project.ps1
           else
-            # Fallback: manual copy
+            # Fallback: manual copy (main.js lives in android/)
             rm -rf android/app/src/main/assets/nodejs-project
             mkdir -p android/app/src/main/assets/nodejs-project
-            cp -r server.js main.js startup-port.js package.json package-lock.json android/app/src/main/assets/nodejs-project/
+            cp -r server.js startup-port.js package.json package-lock.json android/app/src/main/assets/nodejs-project/
+            cp -r android/main.js android/app/src/main/assets/nodejs-project/
             cp -r lang games bots public android/app/src/main/assets/nodejs-project/
             cp -r node_modules android/app/src/main/assets/nodejs-project/
           fi

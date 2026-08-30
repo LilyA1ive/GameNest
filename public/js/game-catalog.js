@@ -2,7 +2,6 @@
   // Built-in Chinese catalog (fallback when language packs aren't loaded)
   var zhCatalog = {
     tictactoe: {
-      id: 'tictactoe',
       name: '井字棋',
       icon: '✦',
       subtitle: '三子连线，最快开局',
@@ -14,10 +13,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 2,
-      cover: ''
     },
     gomoku: {
-      id: 'gomoku',
       name: '五子棋',
       icon: '●',
       subtitle: '十五路攻防，五子成线',
@@ -29,25 +26,21 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 2,
-      cover: ''
     },
     davinci: {
-      id: 'davinci',
       name: '达芬奇密码',
       icon: '🧠',
       subtitle: '推理猜牌，步步试探',
-      description: '通过数字与颜色推断对手隐藏牌。',
-      players: '2-6人',
+      description: '颜色公开，只猜数字。猜对可续猜，猜错需翻牌。',
+      players: '2-4人',
       duration: '约15分钟',
       category: '推理卡牌',
       tags: ['推理', '读心'],
       featured: false,
       supportsAI: true,
-      maxPlayers: 6,
-      cover: ''
+      maxPlayers: 4,
     },
     uno: {
-      id: 'uno',
       name: 'UNO',
       icon: '🃏',
       subtitle: '颜色接龙，一张定胜负',
@@ -59,10 +52,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 6,
-      cover: ''
     },
     doudizhu: {
-      id: 'doudizhu',
       name: '斗地主',
       icon: '♠',
       subtitle: '叫地主，抢节奏',
@@ -74,10 +65,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 3,
-      cover: ''
     },
     'exploding-kittens': {
-      id: 'exploding-kittens',
       name: '爆炸猫',
       icon: '💣',
       subtitle: '抽牌避险，反转不断',
@@ -89,10 +78,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 6,
-      cover: ''
     },
     rummikub: {
-      id: 'rummikub',
       name: '魔力桥',
       icon: '▦',
       subtitle: '拆牌重组，手感很足',
@@ -104,55 +91,73 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 4,
-      cover: ''
+    },
+    sudoku: {
+      name: '数独',
+      icon: '▦',
+      subtitle: '九宫竞速，先解者胜',
+      description: '同一道题，比拼谁先填满所有空格。可单人练习。',
+      players: '1-4人',
+      duration: '约5分钟',
+      category: '脑力竞速',
+      tags: ['逻辑', '多人同屏'],
+      featured: false,
+      supportsAI: true,
+      maxPlayers: 4,
+    },
+    2048: {
+      name: '2048',
+      icon: '2⁸',
+      subtitle: '滑动合并，先到2048者胜',
+      description: '同一起点，比拼谁先合成2048。可单人练习。',
+      players: '1-4人',
+      duration: '约5分钟',
+      category: '脑力竞速',
+      tags: ['数字', '多人同屏'],
+      featured: false,
+      supportsAI: true,
+      maxPlayers: 4,
     },
     twentyfour: {
-      id: 'twentyfour',
       name: '24点',
       icon: '24',
       subtitle: '四数速算，抢答定输赢',
-      description: '适合一群人一起拼脑速的快节奏竞速题。',
-      players: '2-6人',
+      description: '适合一群人一起拼脑速的快节奏竞速题。可单人练习。',
+      players: '1-6人',
       duration: '约5分钟',
       category: '脑力竞速',
       tags: ['计算', '多人同屏'],
       featured: false,
       supportsAI: true,
       maxPlayers: 6,
-      cover: ''
     },
     minesweeper: {
-      id: 'minesweeper',
       name: '扫雷竞速',
       icon: '✹',
       subtitle: '同图对冲，失误即出局',
-      description: '同一雷区比手感，紧张感很直接。',
-      players: '2-6人',
+      description: '同一雷区比手感，紧张感很直接。可单人练习。',
+      players: '1-6人',
       duration: '约5分钟',
       category: '脑力竞速',
       tags: ['速度', '观察'],
       featured: false,
       supportsAI: false,
       maxPlayers: 6,
-      cover: ''
     },
     numberbomb: {
-      id: 'numberbomb',
       name: '数字炸弹',
       icon: '#',
       subtitle: '缩小范围，别踩中雷',
-      description: '社交局里最容易瞬间上头的猜数字小游戏。',
-      players: '2-10人',
+      description: '社交局里最容易瞬间上头的猜数字小游戏。可单人练习。',
+      players: '1-10人',
       duration: '约10分钟',
       category: '派对卡牌',
       tags: ['社交', '猜测'],
       featured: false,
       supportsAI: true,
       maxPlayers: 10,
-      cover: ''
     },
     oldmaid: {
-      id: 'oldmaid',
       name: '抽鬼牌',
       icon: '👻',
       subtitle: '配对弃牌，躲开鬼牌',
@@ -164,10 +169,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 6,
-      cover: ''
     },
     liarsbar: {
-      id: 'liarsbar',
       name: '骗子酒馆',
       icon: '♣',
       subtitle: '虚张声势，抓住破绽',
@@ -179,10 +182,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 6,
-      cover: ''
     },
     bigtwo: {
-      id: 'bigtwo',
       name: '大老二',
       icon: '♠',
       subtitle: '顺牌压制，先出完获胜',
@@ -194,10 +195,21 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 4,
-      cover: ''
+    },
+    'mahjong-sichuan': {
+      name: '麻将',
+      icon: '🀄',
+      subtitle: '四川血战 / 广东鸡平胡',
+      description: '国粹麻将，支持四川血战到底与广东鸡平胡两种打法。',
+      players: '2-4人',
+      duration: '约20分钟',
+      category: '国粹麻将',
+      tags: ['麻将', '策略'],
+      featured: false,
+      supportsAI: true,
+      maxPlayers: 4,
     },
     texas: {
-      id: 'texas',
       name: '德州扑克',
       icon: 'A',
       subtitle: '下注，读牌，翻盘',
@@ -209,10 +221,9 @@
       featured: true,
       supportsAI: true,
       maxPlayers: 8,
-      cover: '/assets/game-covers/texas-table.png'
+      cover: '/assets/game-covers/texas-table.webp'
     },
     flightchess: {
-      id: 'flightchess',
       name: '飞行棋',
       icon: '✈',
       subtitle: '掷骰起飞，冲刺回家',
@@ -224,10 +235,9 @@
       featured: true,
       supportsAI: true,
       maxPlayers: 4,
-      cover: '/assets/game-covers/flightchess-race.png'
+      cover: '/assets/game-covers/flightchess-race.webp'
     },
     snakebattle: {
-      id: 'snakebattle',
       name: '贪吃蛇大乱斗',
       icon: 'S',
       subtitle: '同图生存，撞线淘汰',
@@ -239,10 +249,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 6,
-      cover: ''
     },
     chinesechess: {
-      id: 'chinesechess',
       name: '中国象棋',
       icon: '楚',
       subtitle: '木纹棋盘，稳扎稳打',
@@ -254,10 +262,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 2,
-      cover: ''
     },
     chess: {
-      id: 'chess',
       name: '国际象棋',
       icon: '♟',
       subtitle: '王车易位，升变将军',
@@ -269,10 +275,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 2,
-      cover: ''
     },
     checkers: {
-      id: 'checkers',
       name: '西洋跳棋',
       icon: '◉',
       subtitle: '强制吃子，升王反击',
@@ -284,10 +288,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 2,
-      cover: ''
     },
     connect4: {
-      id: 'connect4',
       name: '四子棋',
       icon: '🔴',
       subtitle: '重力下落，四子连珠',
@@ -299,10 +301,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 2,
-      cover: ''
     },
     reversi: {
-      id: 'reversi',
       name: '黑白棋',
       icon: '◐',
       subtitle: '翻转夹击，棋多者胜',
@@ -314,10 +314,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 2,
-      cover: ''
     },
     go9: {
-      id: 'go9',
       name: '围棋 9路',
       icon: '○',
       subtitle: '短局围棋，落子见功',
@@ -329,10 +327,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 2,
-      cover: ''
     },
     monopoly: {
-      id: 'monopoly',
       name: '大富翁',
       icon: 'M',
       subtitle: '买地建房，越滚越大',
@@ -344,10 +340,9 @@
       featured: true,
       supportsAI: true,
       maxPlayers: 6,
-      cover: '/assets/game-covers/monopoly-golden-city.png'
+      cover: '/assets/game-covers/monopoly-golden-city.webp'
     },
     suikabattle: {
-      id: 'suikabattle',
       name: '合成大西瓜',
       icon: '◔',
       subtitle: '物理掉落，越合越大',
@@ -359,10 +354,9 @@
       featured: true,
       supportsAI: false,
       maxPlayers: 4,
-      cover: '/assets/game-covers/suika-fruit-arena.png'
+      cover: '/assets/game-covers/suika-fruit-arena.webp'
     },
     sheeptile: {
-      id: 'sheeptile',
       name: '羊了个羊',
       icon: 'Y',
       subtitle: '三消堆叠，清盘才赢',
@@ -374,10 +368,9 @@
       featured: true,
       supportsAI: true,
       maxPlayers: 6,
-      cover: '/assets/game-covers/sheeptile-pasture.png'
+      cover: '/assets/game-covers/sheeptile-pasture.webp'
     },
     drawguess: {
-      id: 'drawguess',
       name: '你画我猜',
       icon: '✎',
       subtitle: '传话接龙，越歪越好笑',
@@ -389,10 +382,9 @@
       featured: true,
       supportsAI: false,
       maxPlayers: 8,
-      cover: '/assets/game-covers/drawguess-party.png'
+      cover: '/assets/game-covers/drawguess-party.webp'
     },
     battleship: {
-      id: 'battleship',
       name: '战舰',
       icon: '⚓',
       subtitle: '排兵布阵，击沉敌舰',
@@ -404,10 +396,8 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 2,
-      cover: ''
     },
     hearts: {
-      id: 'hearts',
       name: '红心大战',
       icon: '♥',
       subtitle: '避分夺分，射月逆转',
@@ -419,10 +409,22 @@
       featured: false,
       supportsAI: true,
       maxPlayers: 4,
-      cover: ''
+    },
+    sanguosha: {
+      name: '三国杀',
+      icon: '⚔',
+      subtitle: '身份局，主公与反贼对决',
+      description: '经典身份局：主公、忠臣、反贼、内奸，杀与闪的智谋对决。',
+      players: '4-8人',
+      duration: '约20分钟',
+      category: '国粹棋牌',
+      tags: ['身份', '策略', '多人'],
+      featured: false,
+      supportsAI: false,
+      maxPlayers: 8,
+      minPlayers: 4,
     },
     truthdare: {
-      id: 'truthdare',
       name: '真心话大冒险',
       icon: '?',
       subtitle: '抽卡问答，派对破冰',
@@ -433,7 +435,7 @@
       tags: ['社交', '轻松'],
       supportsAI: false,
       maxPlayers: 10,
-      cover: '/assets/game-covers/truthdare.png'
+      cover: '/assets/game-covers/truthdare.webp'
     },
   };
 
@@ -442,7 +444,7 @@
 
   Object.keys(catalog).forEach(function(id) {
     if (!catalog[id].cover) {
-      catalog[id].cover = '/assets/game-covers/' + id + '.png';
+      catalog[id].cover = '/assets/game-covers/' + id + '.webp';
     }
   });
 
@@ -459,6 +461,7 @@
     'rummikub',
     'liarsbar',
     'bigtwo',
+    'mahjong-sichuan',
     'hearts',
     'tictactoe',
     'gomoku',
@@ -469,13 +472,16 @@
     'reversi',
     'go9',
     'twentyfour',
+    'sudoku',
+    '2048',
     'minesweeper',
     'numberbomb',
     'oldmaid',
     'exploding-kittens',
     'truthdare',
     'snakebattle',
-    'battleship'
+    'battleship',
+    'sanguosha'
   ];
 
   function getLangPack() {
@@ -489,9 +495,9 @@
     // Merge language pack over base catalog for localized fields
     var lp = getLangPack();
     if (lp && lp[id]) {
-      return Object.assign({}, entry, lp[id]);
+      return Object.assign({ id }, entry, lp[id]);
     }
-    return Object.assign({}, entry);
+    return Object.assign({ id }, entry);
   }
 
   window.gameCatalog = {

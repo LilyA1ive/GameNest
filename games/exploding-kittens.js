@@ -8,26 +8,28 @@ exports.maxPlayers = 6;
 function createDeck(playerCount) {
   playerCount = playerCount || 2;
   const deck = [];
-  // Scale deck size based on player count to ensure enough cards for gameplay
-  // Base: 8 explodes, 8 defuses, 8 each for other types; scale non-explode/defuse cards by playerCount
+  // Official deck: 6 explode, 4 defuse, 4 nope, 4 attack, 4 skip, 4 shuffle,
+  // 4 favor, 4 steal, 5 future. Scale non-essential cards for larger groups.
   const scale = Math.max(1, Math.ceil(playerCount / 2));
 
-  // 8 Exploding Kittens (fixed, always 8 regardless of player count)
-  for (let i = 0; i < 8; i++) deck.push({ type: 'explode', id: 'explode-' + i });
-  // 8 Defuses (fixed, each player gets one + buffer)
-  for (let i = 0; i < 8; i++) deck.push({ type: 'defuse', id: 'defuse-' + i });
-  // Attack (scaled by playerCount)
-  for (let i = 0; i < 8 * scale; i++) deck.push({ type: 'attack', id: 'attack-' + i });
-  // Skip (scaled)
-  for (let i = 0; i < 8 * scale; i++) deck.push({ type: 'skip', id: 'skip-' + i });
-  // See the Future (scaled)
-  for (let i = 0; i < 10 * scale; i++) deck.push({ type: 'future', id: 'future-' + i });
-  // Shuffle (scaled)
-  for (let i = 0; i < 8 * scale; i++) deck.push({ type: 'shuffle', id: 'shuffle-' + i });
-  // Favor (scaled)
-  for (let i = 0; i < 8 * scale; i++) deck.push({ type: 'favor', id: 'favor-' + i });
-  // Steal (scaled)
-  for (let i = 0; i < 8 * scale; i++) deck.push({ type: 'steal', id: 'steal-' + i });
+  // Exploding Kittens (official: 6)
+  for (let i = 0; i < 6; i++) deck.push({ type: 'explode', id: 'explode-' + i });
+  // Defuses (official: 4)
+  for (let i = 0; i < 4; i++) deck.push({ type: 'defuse', id: 'defuse-' + i });
+  // Nope (official: 4) — cancel another player's action
+  for (let i = 0; i < 4 * scale; i++) deck.push({ type: 'nope', id: 'nope-' + i });
+  // Attack (official: 4)
+  for (let i = 0; i < 4 * scale; i++) deck.push({ type: 'attack', id: 'attack-' + i });
+  // Skip (official: 4)
+  for (let i = 0; i < 4 * scale; i++) deck.push({ type: 'skip', id: 'skip-' + i });
+  // See the Future (official: 5)
+  for (let i = 0; i < 5 * scale; i++) deck.push({ type: 'future', id: 'future-' + i });
+  // Shuffle (official: 4)
+  for (let i = 0; i < 4 * scale; i++) deck.push({ type: 'shuffle', id: 'shuffle-' + i });
+  // Favor (official: 4)
+  for (let i = 0; i < 4 * scale; i++) deck.push({ type: 'favor', id: 'favor-' + i });
+  // Steal (official: 4)
+  for (let i = 0; i < 4 * scale; i++) deck.push({ type: 'steal', id: 'steal-' + i });
   return deck;
 }
 
@@ -68,10 +70,10 @@ function initGame(state, playerCount) {
   let remaining = deck.filter(c => c.type !== 'explode' && c.type !== 'defuse');
   shuffle(remaining);
 
-  // Deal 7 cards to each player
+  // Official rule: deal 4 cards to each player, then give each 1 defuse.
   state.hands = [];
   for (let i = 0; i < playerCount; i++) {
-    state.hands[i] = remaining.splice(0, 7);
+    state.hands[i] = remaining.splice(0, 4);
   }
   // Give each player 1 defuse
   for (let i = 0; i < playerCount; i++) {

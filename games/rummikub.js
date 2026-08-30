@@ -152,7 +152,7 @@ function isValidSet(tiles) {
 // Calculate total score
 function tileScore(tiles) {
   if (!tiles || !Array.isArray(tiles)) return 0;
-  return tiles.reduce((sum, t) => sum + (t.wild ? 0 : t.num), 0);
+  return tiles.reduce((sum, t) => sum + (t.wild ? 30 : t.num), 0);
 }
 
 // Can a tile be added to an existing table set?
@@ -228,11 +228,12 @@ exports.handleMove = (data, state, playerIndex) => {
         }
       }
 
-      // Check break requirement
+      // Check break requirement. Jokers score 30 pts in the initial meld
+      // (official rule: a joker used to break the ice is worth 30).
       if (!state.hasBroken[playerIndex] && requireBreak) {
         let handScore = 0;
         for (const t of allTiles) {
-          if (handIds.has(t.id)) handScore += (t.wild ? 0 : t.num);
+          if (handIds.has(t.id)) handScore += (t.wild ? 30 : t.num);
         }
         if (handScore < 30) return 'rk_need_break_ice';
       }

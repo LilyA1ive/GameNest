@@ -1,0 +1,253 @@
+// tests/mahjong-sichuan.test.js — Sichuan Mahjong (四川血战到底)
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const core = require('../games/lib/mahjong-core');
+const game = require('../games/mahjong-sichuan');
+
+// Build a tile object matching core.makeTile shape {k, n, id}
+function t(k, n, i) { return { k, n, id: k + n + '#' + i }; }
+
+// ---- initGame ----
+
+test('initGame: 108 tiles, dealer 14 / others 13, phase void', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  assert.equal(s.phase, 'void');
+  assert.equal(s.currentPlayer, 0);
+  assert.equal(s.hands.length, 4);
+  assert.equal(s.hands[0].length, 14); // dealer
+  assert.equal(s.hands[1].length, 13);
+  assert.equal(s.hands[2].length, 13);
+  assert.equal(s.hands[3].length, 13);
+  const dealt = s.hands.reduce((a, h) => a + h.length, 0);
+  assert.equal(s.deck.length + dealt, 108);
+  assert.equal(s.voidSuit.length, 4);
+  assert.ok(s.voidSuit.every(v => v === undefined), 'void choices start unset');
+  assert.equal(s.winner, null);
+});
+
+test('initGame: honours not present (Sichuan has no feng/jian)', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  for (const hand of s.hands) {
+    for (const tile of hand) {
+      assert.ok(tile.k === 'wan' || tile.k === 'tong' || tile.k === 'tiao',
+        'expected number suit, got ' + tile.k);
+    }
+  }
+});
+
+test('initGame: supports 2 players', () => {
+  const s = game.createState();
+  game.initGame(s, 2);
+  assert.equal(s.hands.length, 2);
+  assert.equal(s.hands[0].length, 14);
+  assert.equal(s.hands[1].length, 13);
+  const dealt = s.hands.reduce((a, h) => a + h.length, 0);
+  assert.equal(s.deck.length + dealt, 108);
+});
+
+// ---- void selection ----
+
+test('void: each player picks a suit; when all chosen, dealer plays', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  assert.equal(game.handleMove({ type: 'void', suit: 'wan' }, s, 0), null);
+  assert.equal(s.voidSuit[0], 'wan');
+  assert.equal(s.phase, 'void'); // not all chosen yet
+  assert.equal(game.handleMove({ type: 'void', suit: 'tong' }, s, 1), null);
+  assert.equal(game.handleMove({ type: 'void', suit: 'tiao' }, s, 2), null);
+  assert.equal(game.handleMove({ type: 'void', suit: 'wan' }, s, 3), null);
+  // all chosen -> dealer (0) plays; dealer already holds 14 (no draw)
+  assert.equal(s.phase, 'play');
+  assert.equal(s.currentPlayer, 0);
+});
+
+test('void: invalid suit rejected', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  const err = game.handleMove({ type: 'void', suit: 'feng' }, s, 0);
+  assert.ok(err, 'expected error for invalid void suit');
+  assert.equal(s.voidSuit[0], undefined);
+});
+
+test('void: wrong player cannot choose out of order', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  const err = game.handleMove({ type: 'void', suit: 'wan' }, s, 2);
+  assert.ok(err, 'player 2 cannot pick during player 0 turn');
+});
+
+// ---- discard ----
+
+function dealAllVoid(s, suits) {
+  // suits: array of 4 suits per player
+  for (let i = 0; i < suits.length; i++) {
+    assert.equal(game.handleMove({ type: 'void', suit: suits[i] }, s, i), null);
+  }
+}
+
+test('discard: dealer discards one tile, moves to claim phase', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  dealAllVoid(s, ['wan', 'tong', 'tiao', 'wan']);
+  assert.equal(s.phase, 'play');
+  const handLen = s.hands[0].length;
+  const tileId = s.hands[0][0].id;
+  assert.equal(game.handleMove({ type: 'discard', tileId }, s, 0), null);
+  assert.equal(s.hands[0].length, handLen - 1);
+  assert.equal(s.discards[0].length, 1);
+  assert.equal(s.discards[0][0].id, tileId);
+  assert.equal(s.phase, 'claim');
+  assert.equal(s.lastDiscard.id, tileId);
+});
+
+test('discard: not your turn rejected', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  dealAllVoid(s, ['wan', 'tong', 'tiao', 'wan']);
+  const err = game.handleMove({ type: 'discard', tileId: s.hands[1][0].id }, s, 1);
+  assert.ok(err, 'player 1 cannot discard during player 0 turn');
+});
+
+test('discard: tile not in hand rejected', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  dealAllVoid(s, ['wan', 'tong', 'tiao', 'wan']);
+  const err = game.handleMove({ type: 'discard', tileId: 'nope#999' }, s, 0);
+  assert.ok(err, 'cannot discard a tile you do not hold');
+});
+
+// ---- pung ----
+
+test('pung: a player can pung the last discard, then must discard', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  dealAllVoid(s, ['wan', 'tong', 'tiao', 'wan']);
+  // Force player 0 to hold a wan:5 to discard, and player 1 to hold two wan:5.
+  const w5 = t('wan', 5, 8001);
+  s.hands[0].push(w5);
+  if (s.hands[0].length > 14) s.hands[0].shift(); // keep dealer at 14
+  // Build player 1 a clean 13-tile hand containing two wan:5
+  s.hands[1] = [
+    t('wan', 5, 9001), t('wan', 5, 9002),
+    t('tong', 1, 9003), t('tong', 2, 9004), t('tong', 3, 9005),
+    t('tong', 4, 9006), t('tong', 5, 9007), t('tong', 6, 9008),
+    t('tiao', 1, 9009), t('tiao', 2, 9010), t('tiao', 3, 9011),
+    t('tiao', 4, 9012), t('tiao', 5, 9013),
+  ];
+
+  assert.equal(game.handleMove({ type: 'discard', tileId: w5.id }, s, 0), null);
+  assert.equal(s.phase, 'claim');
+  const before = s.hands[1].length;
+  assert.equal(game.handleMove({ type: 'pung' }, s, 1), null);
+  // pung: 2 tiles removed from hand, meld added
+  assert.equal(s.hands[1].length, before - 2);
+  assert.equal(s.melds[1].length, 1);
+  assert.equal(s.melds[1][0].type, 'pung');
+  assert.equal(s.currentPlayer, 1);
+  assert.equal(s.phase, 'play'); // must discard
+});
+
+// ---- win detection ----
+
+function winningHand() {
+  // 4 melds + pair, using wan + tiao only (void = tong)
+  // 1w2w3w, 4w5w6w, 7w8w9w (3 seq), 1t1t1t (pung), 2iao2iao (pair)
+  const hand = [
+    t('wan', 1, 1), t('wan', 2, 2), t('wan', 3, 3),
+    t('wan', 4, 4), t('wan', 5, 5), t('wan', 6, 6),
+    t('wan', 7, 7), t('wan', 8, 8), t('wan', 9, 9),
+    t('tiao', 1, 10), t('tiao', 1, 11), t('tiao', 1, 12),
+    t('tiao', 2, 13), t('tiao', 2, 14),
+  ];
+  return hand;
+}
+
+test('win: self-draw winning hand registers a winner', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  dealAllVoid(s, ['tong', 'tong', 'tong', 'tong']); // void tong; winning hand has no tong
+  // Set player 0 hand to a winning 14-tile hand
+  s.hands[0] = winningHand();
+  s.phase = 'play';
+  s.currentPlayer = 0;
+  s.drawn = s.hands[0][13].id; // simulate last drawn
+  const res = game.handleMove({ type: 'win' }, s, 0);
+  assert.equal(res, null);
+  assert.ok(s.winners.includes(0), 'player 0 should be a winner');
+  assert.match(s.phase, /win|over/);
+});
+
+test('win: cannot win while holding void-suit tiles', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  dealAllVoid(s, ['tiao', 'tiao', 'tiao', 'tiao']); // void = tiao
+  // winning hand contains tiao tiles -> illegal win
+  s.hands[0] = winningHand();
+  s.phase = 'play';
+  s.currentPlayer = 0;
+  const res = game.handleMove({ type: 'win' }, s, 0);
+  assert.ok(res, 'expected error: still holding void-suit tiles');
+  assert.ok(!s.winners.includes(0));
+});
+
+test('win: non-winning hand rejected', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  dealAllVoid(s, ['tong', 'tong', 'tong', 'tong']);
+  // Scrambled hand that cannot win
+  s.hands[0] = [
+    t('wan', 1, 1), t('wan', 4, 4), t('wan', 7, 7),
+    t('tiao', 2, 8), t('tiao', 5, 11), t('tiao', 8, 14),
+    t('wan', 2, 2), t('wan', 5, 5), t('wan', 8, 8),
+    t('tiao', 3, 9), t('tiao', 6, 12), t('tiao', 9, 15),
+    t('wan', 3, 3), t('wan', 6, 6),
+  ];
+  s.phase = 'play';
+  s.currentPlayer = 0;
+  const res = game.handleMove({ type: 'win' }, s, 0);
+  assert.ok(res, 'scrambled hand should not win');
+});
+
+// ---- playerView ----
+
+test('playerView: hides opponent hands, reveals own hand + melds/discards/void', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  dealAllVoid(s, ['wan', 'tong', 'tiao', 'wan']);
+  const view = game.playerView(s, 0);
+  // own hand fully visible
+  assert.deepEqual(view.hands[0], s.hands[0]);
+  // opponent hands hidden: only count
+  assert.equal(view.hands[1].length, s.hands[1].length);
+  assert.ok(view.hands[1].every(t => t && t.k === undefined && t.n === undefined),
+    'opponent tiles should be blanked');
+  // public info preserved
+  assert.deepEqual(view.discards, s.discards);
+  assert.deepEqual(view.melds, s.melds);
+  assert.deepEqual(view.voidSuit, s.voidSuit);
+  assert.equal(view.phase, s.phase);
+});
+
+// ---- blood battle: game continues after first win ----
+
+test('blood battle: a second player can still win after first winner', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  dealAllVoid(s, ['tong', 'tong', 'tong', 'tong']);
+  // Player 0 wins
+  s.hands[0] = winningHand();
+  s.phase = 'play';
+  s.currentPlayer = 0;
+  s.drawn = s.hands[0][13].id;
+  assert.equal(game.handleMove({ type: 'win' }, s, 0), null);
+  assert.ok(s.winners.includes(0));
+  // Player 1 also has a winning hand and it's their turn
+  s.hands[1] = winningHand();
+  s.phase = 'play';
+  s.currentPlayer = 1;
+  s.drawn = s.hands[1][13].id;
+  assert.equal(game.handleMove({ type: 'win' }, s, 1), null);
+  assert.ok(s.winners.includes(1));
+});

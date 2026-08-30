@@ -220,6 +220,14 @@ exports.handleMove = (data, state, playerIndex) => {
       return 'bt_doesnt_beat';
     }
   }
+  // First play of the game must contain the ♦3 (official rule).
+  if (!state.lastPlay && state.currentPlayer === findDiamond3Player(state)) {
+    const hasDiamond3 = played.some(function(c) { return c.rank === '3' && c.suit === 'd'; });
+    if (!hasDiamond3) {
+      hand.push(...played); sortHand(hand);
+      return 'bt_first_must_have_d3';
+    }
+  }
 
   state.lastPlay = { player: playerIndex, cards: played.map(c => ({ ...c })), play: playType };
   state.lastPlayPlayer = playerIndex;

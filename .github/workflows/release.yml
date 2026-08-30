@@ -56,7 +56,8 @@ jobs:
           else
             rm -rf android/app/src/main/assets/nodejs-project
             mkdir -p android/app/src/main/assets/nodejs-project
-            cp -r server.js main.js startup-port.js package.json package-lock.json android/app/src/main/assets/nodejs-project/
+            cp -r server.js startup-port.js package.json package-lock.json android/app/src/main/assets/nodejs-project/
+            cp -r android/main.js android/app/src/main/assets/nodejs-project/
             cp -r lang games bots public android/app/src/main/assets/nodejs-project/
             cp -r node_modules android/app/src/main/assets/nodejs-project/
           fi
@@ -84,7 +85,6 @@ jobs:
         run: |
           mkdir -p dist/portable
           cp server.js desktop-entry.js startup-port.js package.json package-lock.json dist/portable/
-          cp start.bat start.vbs dist/portable/
           cp -r games bots public lang dist/portable/
           cd dist/portable
           zip -r ../GameNest-Portable.zip .

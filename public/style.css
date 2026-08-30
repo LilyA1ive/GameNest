@@ -639,7 +639,7 @@ button, input { font-family: inherit; font-size: inherit; }
   background: rgba(0, 0, 0, 0.45);
   z-index: 200;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   animation: avatarFade 0.2s ease;
 }
@@ -647,14 +647,21 @@ button, input { font-family: inherit; font-size: inherit; }
 
 .avatar-drawer-sheet {
   background: var(--surface);
-  width: 100%;
-  max-width: 480px;
+  width: 92%;
+  max-width: 420px;
   max-height: 70vh;
-  border-radius: 20px 20px 0 0;
-  padding: 10px 16px calc(20px + env(safe-area-inset-bottom, 0px));
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.18);
+  border-radius: 16px;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   overflow-y: auto;
   animation: avatarSlideUp 0.26s cubic-bezier(.2, .8, .2, 1);
+}
+/* Mobile: make the drawer nearly full-height and emoji grid compact so all
+   avatars are visible without scrolling to the bottom. */
+@media (max-width: 480px) {
+  .avatar-drawer-sheet { max-height: 90vh; padding: 8px 10px calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .emoji-grid { grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 6px; }
+  .emoji-btn { width: 32px; height: 32px; font-size: 16px; }
 }
 @keyframes avatarSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
@@ -1398,7 +1405,9 @@ body.lobby-page {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  min-height: 100dvh;
+  /* Subtract body's top+bottom padding (28px each) so the shell fills the
+     viewport exactly without leaving dead scroll space below the game. */
+  min-height: calc(100dvh - 56px);
 }
 
 .game-topbar {
@@ -1866,7 +1875,7 @@ body.lobby-page {
   inset: 0 348px 0 0;
   background:
     linear-gradient(120deg, rgba(24,24,22,0.78), rgba(24,24,22,0.38) 48%, rgba(24,24,22,0.08)),
-    url("/assets/game-covers/monopoly-golden-city.png") center / cover;
+    url("/assets/game-covers/monopoly-golden-city.webp") center / cover;
 }
 
 .lobby-page .lobby-hero::after {
@@ -2488,7 +2497,7 @@ body.lobby-page {
   inset: 0 400px 0 0;
   background:
     linear-gradient(120deg, rgba(24,24,22,0.72), rgba(24,24,22,0.34) 54%, rgba(24,24,22,0.02)),
-    url("/assets/game-covers/monopoly-golden-city.png") center 42% / cover;
+    url("/assets/game-covers/monopoly-golden-city.webp") center 42% / cover;
 }
 
 .lobby-page .lobby-hero::after,

@@ -130,15 +130,17 @@ cd android
 ```text
 .
 |-- server.js                 # Express + WebSocket 服务端、房间管理、消息路由、AI 调度
-|-- main.js                   # Android 的 nodejs-mobile 入口
+|-- desktop-entry.js          # 桌面启动器（pkg 入口，与 server.js 同级）
+|-- startup-port.js           # 端口重试辅助（server.js 依赖）
 |-- games/                    # 游戏规则与状态流转
 |-- bots/                     # AI 走法生成
 |-- lang/                     # 服务端文本
 |-- public/                   # 大厅、游戏壳、渲染器、样式、资源
 |-- scripts/                  # 检查和维护脚本
 |-- tests/                    # node:test 回归测试
-|-- android/                  # Android Studio 包装工程
-`-- docs/                     # 架构与发布文档
+|-- android/                  # Android Studio 包装工程（含 nodejs-mobile main.js）
+|-- docs/                     # 架构与发布文档
+`-- archive/                  # 本地存档（不跟踪）
 ```
 
 补充资料：
@@ -149,7 +151,7 @@ cd android
 - `scripts/generate-cover-art.js`（封面生成）
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 说明服务端、WebSocket 和渲染器流程。
 - [CONTRIBUTING.md](CONTRIBUTING.md) 提供新增游戏清单。
-  
+
 
 ## 参与贡献
 

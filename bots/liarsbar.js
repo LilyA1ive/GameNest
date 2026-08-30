@@ -13,7 +13,7 @@ exports.createBot = function(playerIndex) {
         return { action: 'shoot' };
       }
 
-      if (hand.length === 0) return { action: 'play', cardId: '' };
+      if (hand.length === 0) return { action: 'play', cardIds: [] };
 
       const themeRank = state.themeRank;
       const exactThemeCards = hand.filter((card) => card.rank === themeRank);
@@ -26,33 +26,35 @@ exports.createBot = function(playerIndex) {
       }
 
       if (exactThemeCards.length > 0) {
-        return { action: 'play', cardId: chooseLeastCriticalCard(exactThemeCards, hand).id };
+        const count = Math.min(exactThemeCards.length, 3);
+        return { action: 'play', cardIds: exactThemeCards.slice(0, count).map(c => c.id) };
       }
 
       if (wildCards.length > 0) {
         const shouldSpendWild = hand.length <= 2 || countLiveNonThemeMatches(state, playerIndex, themeRank) === 0;
         if (shouldSpendWild) {
-          return { action: 'play', cardId: wildCards[0].id };
+          const count = Math.min(wildCards.length, 3);
+          return { action: 'play', cardIds: wildCards.slice(0, count).map(c => c.id) };
         }
       }
 
       if (ghostCard) {
         const nonGhostCount = hand.filter((card) => card.suit !== 'ghost').length;
         if (nonGhostCount <= 1) {
-          return { action: 'play', cardId: ghostCard.id };
+          return { action: 'play', cardIds: [ghostCard.id] };
         }
       }
 
       const lieCards = hand.filter((card) => card.suit !== 'wild' && card.suit !== 'ghost');
       if (lieCards.length > 0) {
-        return { action: 'play', cardId: chooseLeastCriticalCard(lieCards, hand).id };
+        return { action: 'play', cardIds: [chooseLeastCriticalCard(lieCards, hand).id] };
       }
 
       if (themeCards.length > 0) {
-        return { action: 'play', cardId: themeCards[0].id };
+        return { action: 'play', cardIds: [themeCards[0].id] };
       }
 
-      return { action: 'play', cardId: hand[0].id };
+      return { action: 'play', cardIds: [hand[0].id] };
     }
   };
 };

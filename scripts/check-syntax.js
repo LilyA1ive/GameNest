@@ -5,7 +5,7 @@ const { spawnSync } = require('child_process');
 const root = path.resolve(__dirname, '..');
 const targets = [
   'server.js',
-  'main.js',
+  'android/main.js',
   'startup-port.js',
   'games',
   'bots',

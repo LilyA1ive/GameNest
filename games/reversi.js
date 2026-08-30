@@ -95,6 +95,9 @@ exports.handleMove = (data, state, playerIndex) => {
   var ROWS = sz.ROWS, COLS = sz.COLS;
 
   if (data && data.pass) {
+    // Official rule: may only pass when holding no legal move.
+    var legalMoves = getLegalMoves(state.board, playerIndex, ROWS, COLS);
+    if (legalMoves.length > 0) return 'rv_must_play_if_possible';
     state.passCount++;
     if (state.passCount >= 2) {
       var scores = countPieces(state.board, ROWS, COLS);

@@ -32,7 +32,7 @@ exports.handleMove = (data, state, playerIndex) => {
       if (r >= 0 && r < 15 && c >= 0 && c < 15 && state.board[r][c] === playerIndex) count++;
       else break;
     }
-    if (count >= 5) { state.winner = playerIndex; return null; }
+    if (count === 5) { state.winner = playerIndex; return null; }
   }
 
   state.currentPlayer = 1 - playerIndex;

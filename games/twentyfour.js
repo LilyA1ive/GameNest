@@ -3,6 +3,7 @@
 
 exports.name = 'twentyfour';
 exports.maxPlayers = 99;
+exports.minPlayers = 1;
 
 // Pre-shuffled pool of all solvable 4-number combinations (1-13, sorted key, deduplicated).
 // Built once on first use, reshuffled each time it's exhausted.

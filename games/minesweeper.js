@@ -3,6 +3,7 @@
 
 exports.name = 'minesweeper';
 exports.maxPlayers = 6;
+exports.minPlayers = 1;
 
 const DEFAULT_ROWS = 10;
 const DEFAULT_COLS = 10;

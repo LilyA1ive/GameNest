@@ -44,6 +44,10 @@ if (!process.env.ANDROID_SKIP_REGISTRY_LOAD) {
     if (file.endsWith('.js')) {
       logStep('[android-node] loading game module: ' + file);
       const mod = require(path.join(gamesDir, file));
+      // Skip data/support files (e.g. drawguess-words.js word lists) that don't
+      // implement the game-module interface. Registering them under `undefined`
+      // made create_room crash when a stale/undefined game code reached the player.
+      if (typeof mod.createState !== 'function' || typeof mod.handleMove !== 'function') return;
       gameRegistry[mod.name] = mod;
     }
   });
@@ -68,7 +72,18 @@ logStep('[android-node] server.js require complete');
 
 logStep('[android-node] server.js init express app');
 const app = express();
-// Always revalidate static assets so clients never run a stale cached HTML/CSS/JS.
+// gzip text-based assets (HTML/CSS/JSON/JS). PNG/JPG/WebP are already compressed
+// so the filter skips them to save CPU on every request.
+const compression = require('compression');
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  },
+  threshold: 512, // only compress responses > 512 bytes
+}));
+// Static assets: keep no-cache for HTML shells (so clients pick up new JS/CSS),
+// but allow short caching of versioned/hashed assets if added later.
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: true,
   lastModified: true,
@@ -83,7 +98,15 @@ app.get('/qr', async (req, res) => {
   try {
     const room = req.query.room;
     if (!room) { res.status(400).send('missing room'); return; }
-    const host = req.get('Host') || 'localhost:3000';
+    // Prefer a real LAN IP so the QR is scannable from a phone on the same WiFi.
+    // When the requester came via localhost/127.0.0.1, using that Host makes the
+    // QR point at the phone's own loopback — useless. Fall back to the first
+    // shareable 192.168.x.x / 10.x.x.x address.
+    let host = req.get('Host') || 'localhost:3000';
+    if (/^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(host)) {
+      const lan = getShareableLanIPs()[0];
+      if (lan) host = `${lan.ip}:${activePort}`;
+    }
     const proto = req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const url = `${proto}://${host}/?room=${room}`;
     const png = await QRCode.toBuffer(url, { width: 256, margin: 2, color: { dark: '#1a1a1a', light: '#ffffff' } });
@@ -148,6 +171,14 @@ function generateRoomId() {
 function createRoom(ws, gameType, lang) {
   const gameMod = gameRegistry[gameType];
   if (!gameMod) { return null; }
+  let initialState;
+  try {
+    initialState = gameMod.createState();
+  } catch (e) {
+    // A single bad/misconfigured state factory must not crash the whole server.
+    console.error('createState failed for game "' + gameType + '":', e && e.message);
+    return null;
+  }
   const roomId = generateRoomId();
   const room = {
     game: gameType,
@@ -155,7 +186,7 @@ function createRoom(ws, gameType, lang) {
     _lang: lang || 'zh',
     players: new Map(),
     bots: new Map(),
-    state: gameMod.createState(),
+    state: initialState,
     hostWS: ws,
     _roomId: roomId,
     _cleanupTimer: null,
@@ -225,6 +256,7 @@ function skipDisconnectedTurn(room) {
   const gameMod = gameRegistry[room.game];
   const cp = getCurrentActor(state, gameMod);
   if (!Number.isInteger(cp)) return false;
+  if (cp < 0) return false; // no turn owner yet (e.g. choosing phase)
 
   const active = new Set();
   for (const [ws, info] of room.players) {
@@ -352,17 +384,6 @@ function scheduleTwentyFourTimer(room) {
   }, ms);
 }
 
-// drawguess: per-player filtered broadcast (never broadcast the raw state — it contains the word)
-function sendDrawguessViews(room) {
-  const gameMod = gameRegistry['drawguess'];
-  for (const [client, info] of room.players) {
-    if (client.readyState === 1) {
-      const viewState = gameMod.playerView(room.state, info.index);
-      client.send(JSON.stringify({ type: 'game_state', state: viewState, players: roomPlayersList(room) }));
-    }
-  }
-}
-
 // drawguess: server-side step timer — auto-advances when a player stalls
 function scheduleDrawguessTimer(room) {
   clearTimeout(room._dgTimer);
@@ -398,7 +419,7 @@ function scheduleDrawguessTimer(room) {
     } else {
       state.stepDeadline = 0;
     }
-    sendDrawguessViews(room);
+    broadcastGameView(room, 'game_state');
   }, ms);
 }
 
@@ -423,7 +444,7 @@ function scheduleRealtimeGame(room) {
         gameMod.handleMove(move, room.state, index);
       }
       gameMod.tick(room.state);
-      broadcastRoom(room, { type: 'game_state', state: room.state, players: roomPlayersList(room) });
+      broadcastGameView(room, 'game_state');
       if (room.state.winner !== null) stopRealtimeGame(room);
     } catch (e) {
       console.error('Realtime game exception:', e.message);
@@ -456,6 +477,7 @@ function scheduleBotMove(room) {
   }
 
   const cp = getCurrentActor(state, gameMod);
+  if (cp < 0) return; // no turn owner yet (e.g. choosing phase)
   const bot = room.bots.get(cp);
   if (!bot) return;
 
@@ -611,6 +633,37 @@ wss.on('connection', (ws) => {
       bot.name = currentRoom._lang === 'zh' ? '电脑' + (botIndex + 1) : 'Bot ' + (botIndex + 1);
       if (!currentRoom.bots) currentRoom.bots = new Map();
       currentRoom.bots.set(botIndex, bot);
+      broadcastRoom(currentRoom, {
+        type: 'room_update',
+        phase: currentRoom.phase,
+        players: roomPlayersList(currentRoom),
+      });
+      return;
+    }
+
+    // --- remove_bot ---
+    if (type === 'remove_bot') {
+      if (!currentRoom) return;
+      if (ws !== currentRoom.hostWS) {
+        ws.send(JSON.stringify({ type: 'error', message: serverT(currentRoom, 'host_only_remove_bot') }));
+        return;
+      }
+      if (currentRoom.phase === 'playing') {
+        ws.send(JSON.stringify({ type: 'error', message: serverT(currentRoom, 'game_started_remove_bot') }));
+        return;
+      }
+      const { botIndex } = data || {};
+      if (typeof botIndex === 'number' && currentRoom.bots) {
+        currentRoom.bots.delete(botIndex);
+        // Re-index remaining bots so names stay sequential.
+        const entries = [...currentRoom.bots.entries()].sort((a, b) => a[0] - b[0]);
+        currentRoom.bots.clear();
+        entries.forEach(([, bot], i) => {
+          bot.index = i;
+          bot.name = currentRoom._lang === 'zh' ? '电脑' + (i + 1) : 'Bot ' + (i + 1);
+          currentRoom.bots.set(i, bot);
+        });
+      }
       broadcastRoom(currentRoom, {
         type: 'room_update',
         phase: currentRoom.phase,
@@ -941,6 +994,21 @@ wss.on('connection', (ws) => {
       broadcastGameView(currentRoom, 'game_state');
       if (currentRoom.game === 'doudizhu') scheduleTurnTimer(currentRoom);
       scheduleBotMove(currentRoom);
+      return;
+    }
+
+    // --- request_restart (non-host asks the host to start a new game) ---
+    if (type === 'request_restart') {
+      if (!currentRoom) return;
+      if (ws === currentRoom.hostWS) return; // host uses game_restart directly
+      const requester = currentRoom.players.get(ws);
+      // Tell the host someone wants to restart.
+      if (currentRoom.hostWS && currentRoom.hostWS.readyState === 1) {
+        currentRoom.hostWS.send(JSON.stringify({
+          type: 'restart_requested',
+          by: requester ? requester.name : 'Player',
+        }));
+      }
       return;
     }
 

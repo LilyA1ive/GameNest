@@ -18,11 +18,12 @@
   var lastDiscardKey = null;
   var lastHandSignature = null;
   var lastHandLen = 0;
+  var lastChallengeKey = null; // detects when a challenge resolves, to toast the result
 
   var STYLES = '' +
     '.uno-table{width:100%;display:flex;flex-direction:column;gap:5px;}' +
-    '.uno-opponents{display:flex;flex-wrap:wrap;gap:5px;}' +
-    '.uno-opponent{flex:1;min-width:100px;display:flex;flex-direction:column;align-items:flex-start;padding:6px 10px;background:var(--bg);border-radius:12px;font-size:12px;font-weight:600;border:2px solid transparent;transition:border-color .25s;}' +
+    '.uno-opponents{display:flex;flex-wrap:wrap;gap:5px;max-height:22vh;overflow-y:auto;flex-shrink:0;align-items:flex-start;align-content:flex-start;}' +
+    '.uno-opponent{flex:0 1 auto;min-width:70px;max-width:140px;display:flex;flex-direction:column;align-items:flex-start;padding:4px 6px;background:var(--bg);border-radius:10px;font-size:10px;font-weight:600;border:2px solid transparent;transition:border-color .25s;overflow:hidden;}' +
     '.uno-opponent.active-turn{border-color:var(--accent);background:var(--surface);animation:pulse 2s ease infinite;}' +
     '.uno-opponent .opp-top{display:flex;justify-content:space-between;align-items:center;width:100%;}' +
     '.uno-opponent .card-count{font-size:11px;color:var(--text-muted);}' +
@@ -41,15 +42,15 @@
     '.uno-draw-pile .dl{font-size:10px;color:#999;margin-top:1px;}' +
     '.uno-draw-stack{position:absolute;top:-6px;right:-6px;background:#e74c3c;color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.2);}' +
     '.uno-dir-arrow{font-size:16px;margin:0 3px;}' +
-    '.uno-hand-wrap{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding:4px 2px;margin:0 -4px;}' +
+    '.uno-hand-wrap{padding:4px 2px;margin:0 -4px;}' +
     '.uno-hand-wrap::-webkit-scrollbar{height:3px;}' +
     '.uno-hand-wrap::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px;}' +
-    '.uno-hand{display:flex;gap:6px;padding:2px 4px;min-height:90px;}' +
-    '.uno-card{width:60px;height:88px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,.13);cursor:pointer;transition:transform .15s,opacity .15s,box-shadow .15s;flex-shrink:0;position:relative;}' +
+    '.uno-hand{display:flex;flex-wrap:wrap;gap:6px;padding:2px 4px;justify-content:center;}' +
+    '.uno-card{width:48px;height:72px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,.13);cursor:pointer;transition:transform .15s,opacity .15s,box-shadow .15s;flex-shrink:0;position:relative;}' +
     '.uno-card.new-card{animation:unoNewCardIn .38s ease;}' +
     '.uno-card:active{transform:scale(.94);}' +
     '.uno-card.wild-rainbow{background:linear-gradient(135deg,#e74c3c 25%,#3498db 25%,#3498db 50%,#2ecc71 50%,#2ecc71 75%,#f1c40f 75%);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4);}' +
-    '.uno-card .cv{font-size:22px;line-height:1;}' +
+    '.uno-card .cv{font-size:18px;line-height:1;}' +
     '.uno-card .cl{font-size:8px;opacity:.8;margin-top:1px;text-transform:uppercase;}' +
     '.uno-card.not-playable{opacity:.35;cursor:default;}' +
     '.uno-card.not-playable:active{transform:none;}' +
@@ -136,6 +137,16 @@
             '<div style="font-size:18px;font-weight:700;margin-bottom:10px">' + t('uno_choose_color') + '</div>' +
             '<div class="uno-color-picker-btns" id="unoColorBtns"></div>' +
           '</div>' +
+        '</div>' +
+        '<div class="overlay" id="unoChallenge" style="display:none">' +
+          '<div class="overlay-card">' +
+            '<div style="font-size:18px;font-weight:700;margin-bottom:6px">' + t('uno_challenge_title') + '</div>' +
+            '<div style="font-size:13px;color:var(--text-muted);margin-bottom:14px">' + t('uno_challenge_hint') + '</div>' +
+            '<div style="display:flex;gap:10px;justify-content:center">' +
+              '<button class="btn btn-sm" id="unoChallengeAccept">' + t('uno_challenge_accept') + '</button>' +
+              '<button class="btn btn-sm uno-btn-warn" id="unoChallengeCall">' + t('uno_challenge_call') + '</button>' +
+            '</div>' +
+          '</div>' +
         '</div>';
 
       // Color picker buttons
@@ -166,6 +177,17 @@
       document.getElementById('unoBtn').addEventListener('click', function() {
         window.makeGameMove({ uno: true });
       });
+
+      // +4 Challenge buttons (shown to the target player)
+      document.getElementById('unoChallengeAccept').addEventListener('click', function() {
+        document.getElementById('unoChallenge').style.display = 'none';
+        window.makeGameMove({ challengeResponse: 'accept' });
+      });
+      document.getElementById('unoChallengeCall').addEventListener('click', function() {
+        document.getElementById('unoChallenge').style.display = 'none';
+        window.makeGameMove({ challengeResponse: 'challenge' });
+      });
+
     },
 
     render: function(state, container, playerIndex, winner) {
@@ -190,29 +212,16 @@
       renderDrawPile(deck, drawStack);
       renderHand(hands[playerIndex] || [], discard, currentColor, isMyTurn, drewCard);
       renderButtons(hands[playerIndex] || [], drawStack, isMyTurn, unoCalled[playerIndex]);
+      renderChallenge(state, playerIndex);
       lastDiscardKey = discardKey;
       lastHandSignature = handSignature;
       lastHandLen = currentLen;
 
       // Scroll hint for small screens with many cards
       var hand = hands[playerIndex] || [];
+      // Swipe hint removed - cards now wrap into multiple rows on mobile.
       var hintEl = document.getElementById('unoScrollHint');
-      var handWrap = document.getElementById('unoHandWrap');
-      if (hintEl && handWrap) {
-        if (hand.length > 5 && isMyTurn) {
-          hintEl.style.display = '';
-          if (!handWrap.dataset.scrollWatched) {
-            handWrap.dataset.scrollWatched = '1';
-            handWrap.addEventListener('scroll', function() {
-              hintEl.style.opacity = '0';
-              hintEl.style.transition = 'opacity 0.5s';
-              setTimeout(function() { hintEl.style.display = 'none'; }, 500);
-            }, { once: true });
-          }
-        } else {
-          hintEl.style.display = 'none';
-        }
-      }
+      if (hintEl) hintEl.style.display = 'none';
     }
   });
 
@@ -228,8 +237,12 @@
       var active = i === currentPlayer ? ' active-turn' : '';
       var called = unoCalled && unoCalled[i] && count === 1;
       var notCalled = count === 1 && !called;
+      // Show at most 7 card backs; add a "+N" chip for the rest so the
+      // opponent area doesn't stretch tall when someone holds many cards.
+      var maxBacks = 7;
       var backs = '';
-      for (var b = 0; b < Math.min(count, 15); b++) backs += '<div class="mini-back"></div>';
+      for (var b = 0; b < Math.min(count, maxBacks); b++) backs += '<div class="mini-back"></div>';
+      if (count > maxBacks) backs += '<span style="font-size:10px;color:var(--text-muted);align-self:center;">+' + (count - maxBacks) + '</span>';
       html += '' +
         '<div class="uno-opponent' + active + '">' +
           '<div class="opp-top">' +
@@ -374,6 +387,54 @@
       drawBtn.style.display = 'none';
       unoBtn.style.display = 'none';
     }
+  }
+
+  // Tracks the last challenge so we can reveal the result AFTER it resolves.
+  var lastChallengeState = null;
+
+  function renderChallenge(state, playerIndex) {
+    var overlay = document.getElementById('unoChallenge');
+    if (!overlay) return;
+    var ch = state.pendingChallenge;
+
+    // Challenge resolved: reveal whether the +4 player held a matching card.
+    if (!ch && lastChallengeState) {
+      var prev = lastChallengeState;
+      lastChallengeState = null;
+      var hadMatch = (prev.handSnapshot || []).some(function(c) { return c.color === prev.priorColor; });
+      var byName = (window.gamePlayers && window.gamePlayers[prev.by]) ? window.gamePlayers[prev.by].name : tf('uno_player', prev.by + 1);
+      if (hadMatch) {
+        showToast(tf('uno_challenge_result_cheat', byName)); // +4 player cheated, they draw 4
+      } else {
+        showToast(tf('uno_challenge_result_clean', byName)); // +4 was legal, challenger draws 6
+      }
+      overlay.style.display = 'none';
+      return;
+    }
+
+    if (!ch) { overlay.style.display = 'none'; return; }
+    lastChallengeState = ch;
+
+    // Only the target player decides; others see a waiting note.
+    // IMPORTANT: do NOT reveal the hand here — the challenge must be a blind
+    // decision. The hand is only shown after the challenge resolves.
+    var isTarget = ch.target === playerIndex;
+    var byName = (window.gamePlayers && window.gamePlayers[ch.by]) ? window.gamePlayers[ch.by].name : tf('uno_player', ch.by + 1);
+
+    var titleEl = overlay.querySelector('.overlay-card > div:first-child');
+    var hintEl = overlay.querySelector('.overlay-card > div:nth-child(2)');
+    var btns = overlay.querySelector('#unoChallengeAccept').parentNode;
+
+    if (isTarget) {
+      if (titleEl) titleEl.textContent = t('uno_challenge_title');
+      if (hintEl) hintEl.textContent = tf('uno_challenge_hint', byName);
+      btns.style.display = '';
+    } else {
+      if (titleEl) titleEl.textContent = tf('uno_challenge_wait_title', byName);
+      if (hintEl) hintEl.textContent = t('uno_challenge_wait_hint');
+      btns.style.display = 'none';
+    }
+    overlay.style.display = 'flex';
   }
 
   function canPlayCard(card, topCard, currentColor) {

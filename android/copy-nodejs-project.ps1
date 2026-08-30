@@ -25,9 +25,9 @@ if (Test-Path $dest) {
 New-Item -ItemType Directory -Force $dest | Out-Null
 
 # Files and folders to copy
+# NOTE: main.js lives in android/ (nodejs-mobile entry), copy it from there.
 $items = @(
     "server.js",
-    "main.js",
     "startup-port.js",
     "package.json",
     "package-lock.json",
@@ -46,6 +46,15 @@ foreach ($item in $items) {
     } else {
         Write-Host "  Skipping $item (not found)" -ForegroundColor Yellow
     }
+}
+
+# Copy main.js from android/ (its new home)
+$mainSrc = Join-Path $PSScriptRoot "main.js"
+if (Test-Path $mainSrc) {
+    Write-Host "Copying main.js..."
+    Copy-Item -Force $mainSrc $dest
+} else {
+    Write-Host "  Skipping main.js (not found in android/)" -ForegroundColor Yellow
 }
 
 # Remove dev/test files inside node_modules to shrink APK size

@@ -765,6 +765,38 @@
     'ddz_joker_small': '★小',
     'ddz_joker_big': '★大',
 
+    // ---- 2048 ----
+    'g2048_score': '分数',
+    'g2048_best': '最高分',
+    'g2048_max': '最大',
+    'g2048_hint': '方向键 / 滑动 移动方块',
+    'g2048_lock': '已锁定，等待其他玩家',
+
+    // ---- Sudoku ----
+    'sudoku_dead': '你已出局',
+    'sudoku_progress': '进度',
+    'sudoku_hint': '提示',
+    'sudoku_clear': '清除',
+
+    // ---- Mahjong ----
+    'mj_player': '玩家',
+    'mj_tiles': '张',
+    'mj_void_title': '定缺：选择一门花色，打完该门才能胡牌',
+    'mj_win': '胡',
+    'mj_kong': '杠',
+    'mj_pung': '碰',
+    'mj_chow': '吃',
+    'mj_pass': '过',
+    'mj_no_action': ' — 无操作',
+    'mj_waiting': '等待其他玩家…',
+    'mj_game_over': '本局结束',
+    'mj_settlement': '本局结算',
+    'mj_dealer': ' (庄)',
+    'mj_you': ' (你)',
+    'mj_hu': ' 胡!',
+    'mj_score': '分',
+    'mj_next_round': '下一局',
+
   };
   if (!window.__ACTIVE_LANG) window.__ACTIVE_LANG = 'zh';
   window._t = function(key) {

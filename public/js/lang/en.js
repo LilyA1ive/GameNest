@@ -765,6 +765,38 @@
     'ddz_joker_small': '★S',
     'ddz_joker_big': '★B',
 
+    // ---- 2048 ----
+    'g2048_score': 'Score',
+    'g2048_best': 'Best',
+    'g2048_max': 'Max',
+    'g2048_hint': 'Arrow keys / swipe to move tiles',
+    'g2048_lock': 'Locked, waiting for other players',
+
+    // ---- Sudoku ----
+    'sudoku_dead': 'You are out',
+    'sudoku_progress': 'Progress',
+    'sudoku_hint': 'Hint',
+    'sudoku_clear': 'Clear',
+
+    // ---- Mahjong ----
+    'mj_player': 'Player',
+    'mj_tiles': ' tiles',
+    'mj_void_title': 'Void: choose a suit to discard before winning',
+    'mj_win': 'Win',
+    'mj_kong': 'Kong',
+    'mj_pung': 'Pung',
+    'mj_chow': 'Chow',
+    'mj_pass': 'Pass',
+    'mj_no_action': ' — No action',
+    'mj_waiting': 'Waiting for other players…',
+    'mj_game_over': 'Game Over',
+    'mj_settlement': 'Settlement',
+    'mj_dealer': ' (Dealer)',
+    'mj_you': ' (You)',
+    'mj_hu': ' Win!',
+    'mj_score': ' pts',
+    'mj_next_round': 'Next Round',
+
   };
   if (!window.__ACTIVE_LANG) window.__ACTIVE_LANG = 'en';
   // _t function only needed in zh.js; en.js expects zh.js to have defined it

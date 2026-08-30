@@ -28,6 +28,12 @@
   // 是否广东（带番子）：四川 playerView 总带 cfg，广东不带
   function isCantonese() { return _state && _state.cfg === undefined; }
 
+  // i18n helper (mirrors other renderers: _t(key) with hardcoded fallback).
+  function t(key, fallback) {
+    var v = window._t ? window._t(key) : key;
+    return v === key ? fallback : v;
+  }
+
   var STYLES = '' +
     '.mj-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;height:100%;flex:1;min-height:0;}' +
     '.mj-status{text-align:center;font-size:13px;font-weight:700;min-height:18px;color:var(--text-muted);letter-spacing:.3px;padding:0 8px;}' +
@@ -716,10 +722,10 @@
       var pos = seatPos(i);
       var isActive = _state.currentPlayer === i;
       var isWinner = (_state.winners || []).includes(i);
-      var name = '玩家' + (i + 1);
+      var name = t('mj_player', '玩家') + (i + 1);
       if (window.gamePlayers && window.gamePlayers[i]) name = window.gamePlayers[i].name;
       var count = handCount(i);
-      var label = name + ' (' + count + '张)';
+      var label = name + ' (' + count + t('mj_tiles', '张') + ')';
       if (isWinner) label = '🏆 ' + name;
       var textW = ctx.measureText(label).width;
       var padX = 8, padY = 4;
@@ -774,7 +780,7 @@
     var me = _playerIndex;
 
     if (_state.phase === 'void') {
-      status.textContent = '定缺：选择一门花色，打完该门才能胡牌';
+      status.textContent = t('mj_void_title', '定缺：选择一门花色，打完该门才能胡牌');
       var suits = [{ k: 'wan' }, { k: 'tong' }, { k: 'tiao' }];
       for (var i = 0; i < suits.length; i++) {
         (function(suit) {
@@ -798,16 +804,16 @@
         // 有可执行操作：显示对应按钮 + 过
         for (var c = 0; c < claims.length; c++) {
           var claim = claims[c];
-          if (claim === 'win') bar.appendChild(btn('胡', 'win', 'window._mjWin()'));
-          else if (claim === 'kong') bar.appendChild(btn('杠', 'kong', 'window._mjKong()'));
-          else if (claim === 'pung') bar.appendChild(btn('碰', 'pung', 'window._mjPung()'));
-          else if (claim === 'chow') bar.appendChild(btn('吃', 'chow', 'window._mjChow()'));
+          if (claim === 'win') bar.appendChild(btn(t('mj_win', '胡'), 'win', 'window._mjWin()'));
+          else if (claim === 'kong') bar.appendChild(btn(t('mj_kong', '杠'), 'kong', 'window._mjKong()'));
+          else if (claim === 'pung') bar.appendChild(btn(t('mj_pung', '碰'), 'pung', 'window._mjPung()'));
+          else if (claim === 'chow') bar.appendChild(btn(t('mj_chow', '吃'), 'chow', 'window._mjChow()'));
         }
-        bar.appendChild(btn('过', 'pass', 'window._mjPass()'));
+        bar.appendChild(btn(t('mj_pass', '过'), 'pass', 'window._mjPass()'));
       } else {
         // 无操作可执行：自动跳过（不需要显示"过"按钮）
         // 但给玩家一个视觉反馈：短暂显示弃牌信息
-        status.textContent = tileLabel(_state.lastDiscard) + ' — 无操作';
+        status.textContent = tileLabel(_state.lastDiscard) + t('mj_no_action', ' — 无操作');
         // 自动 pass（1.2 秒后）
         setTimeout(function () { if (window.makeGameMove) window.makeGameMove({ type: 'pass' }); }, 1200);
       }
@@ -816,10 +822,10 @@
 
     if (_state.phase === 'play' || _state.phase === 'win') {
       // 不重复座位条已显示的信息；仅在不轮到自己时给一个等待提示
-      status.textContent = _state.currentPlayer === me ? '' : '等待其他玩家…';
+      status.textContent = _state.currentPlayer === me ? '' : t('mj_waiting', '等待其他玩家…');
       return;
     }
-    if (_state.phase === 'over') { status.textContent = '本局结束'; return; }
+    if (_state.phase === 'over') { status.textContent = t('mj_game_over', '本局结束'); return; }
     status.textContent = '';
   }
 
@@ -924,10 +930,10 @@
 
 
   function suitCount(hand, suit) {
-    if (!Array.isArray(hand)) return '0张';
+    if (!Array.isArray(hand)) return '0' + t('mj_tiles', '张');
     var c = 0;
     for (var i = 0; i < hand.length; i++) if (hand[i].k === suit) c++;
-    return c + '张';
+    return c + t('mj_tiles', '张');
   }
 
   function btn(label, cls, fn) {
@@ -1004,7 +1010,7 @@
     ctx.fillStyle = '#c8a45c';
     ctx.font = 'bold 20px system-ui,"Microsoft YaHei",sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('本局结算', W / 2, py + 32);
+    ctx.fillText(t('mj_settlement', '本局结算'), W / 2, py + 32);
 
     // 玩家列表
     var cumScore = _state.cumulativeScore || [0,0,0,0];
@@ -1016,11 +1022,11 @@
       var isWinner = (_state.winners || []).includes(i);
       ctx.fillStyle = isWinner ? '#e05050' : (isDealer ? '#c8a45c' : 'rgba(255,255,255,.85)');
       ctx.textAlign = 'left';
-      var label = '玩家' + (i + 1) + (isDealer ? ' (庄)' : '') + (i === _playerIndex ? ' (你)' : '');
-      if (isWinner) label += ' 胡!';
+      var label = t('mj_player', '玩家') + (i + 1) + (isDealer ? t('mj_dealer', ' (庄)') : '') + (i === _playerIndex ? t('mj_you', ' (你)') : '');
+      if (isWinner) label += t('mj_hu', ' 胡!');
       ctx.fillText(label, px + 20, yy);
       ctx.textAlign = 'right';
-      ctx.fillText(cumScore[i] + '分', px + panelW - 20, yy);
+      ctx.fillText(cumScore[i] + t('mj_score', '分'), px + panelW - 20, yy);
     }
 
     // 下一局按钮
@@ -1030,7 +1036,7 @@
     ctx.fillStyle = '#1a1a1a';
     ctx.font = 'bold 14px system-ui,"Microsoft YaHei",sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('下一局', W / 2, py + panelH - 28);
+    ctx.fillText(t('mj_next_round', '下一局'), W / 2, py + panelH - 28);
   }
 
   // 回调：接线到 makeGameMove（与 room-client 的 webSocket 通信）

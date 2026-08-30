@@ -296,6 +296,12 @@ function resolveClaims(state) {
   }
   state.melds[p].push(meld);
 
+  // Remove the claimed tile from the discard pile so it no longer shows in the center.
+  const discardPile = state.discards[claim.discarder];
+  for (let di = discardPile.length - 1; di >= 0; di--) {
+    if (discardPile[di].id === tile.id) { discardPile.splice(di, 1); break; }
+  }
+
   // kong draws a replacement tile; chow/pung go straight to discard
   state.currentPlayer = p;
   if (best.type === 'kong') {

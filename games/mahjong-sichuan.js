@@ -568,6 +568,10 @@ exports.playerView = function (state, playerIndex) {
     _bloodBattle: state._bloodBattle,
     _rain: state._rain,
     _multiWinner: state._multiWinner,
+    _checkFlowerPig: state._checkFlowerPig,
+    _checkBigCall: state._checkBigCall,
+    _lastFourAutoWin: state._lastFourAutoWin,
+    _swapThree: state._swapThree,
     _gangScore: state._gangScore,
     _penalties: state._penalties,
   };

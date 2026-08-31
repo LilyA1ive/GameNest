@@ -32,6 +32,8 @@ exports.createState = () => ({
   _bloodBattle: true,
   _rain: false,
   _multiWinner: false,
+  _checkFlowerPig: false,
+  _checkBigCall: false,
   // Gang payment tracking: net points per player from 刮风下雨
   _gangScore: [],
   // Round-end penalty tracking (花猪/查大叫)
@@ -54,6 +56,8 @@ exports.initGame = function (state, playerCount) {
   state._bloodBattle = opt.mj_bloodBattle !== false; // default true
   state._rain = opt.mj_rain === true;
   state._multiWinner = opt.mj_multiWinner === true;
+  state._checkFlowerPig = opt.mj_checkFlowerPig === true;
+  state._checkBigCall = opt.mj_checkBigCall === true;
 
   const deck = buildDeck(SICHUAN);
   state.deck = deck;
@@ -554,3 +558,91 @@ function calculateScore(state, winnerIndex) {
 }
 
 exports.calculateScore = calculateScore;
+
+// Check if a 13-tile hand is one tile away from winning (听牌)
+function isReadyHand(hand13, melds, voidSuit) {
+  if (voidSuit) {
+    for (const t of hand13) if (t.k === voidSuit) return false; // still has void suit tiles
+  }
+  // Test adding each possible tile
+  const suits = ['wan', 'tong', 'tiao'];
+  for (const k of suits) {
+    if (k === voidSuit) continue;
+    for (let n = 1; n <= 9; n++) {
+      const testTiles = hand13.concat([{ k, n, id: 'test' }]);
+      const res = huCheck(testTiles, melds, SICHUAN);
+      if (res && res.win) return true;
+    }
+  }
+  return false;
+}
+
+// 流局查花猪/查大叫：计算每个未胡玩家的罚分
+// 返回 { penalties: [...], details: [{player, type, amount, to}] }
+exports.calculatePenalties = function (state) {
+  const playerCount = state.hands.length;
+  const penalties = new Array(playerCount).fill(0);
+  const details = [];
+  if (!state._rain && !state._checkFlowerPig && !state._checkBigCall) return { penalties, details };
+
+  // 查花猪：手里还有缺门花色的玩家
+  const flowerPigs = [];
+  if (state._checkFlowerPig || state._rain) {
+    for (let i = 0; i < playerCount; i++) {
+      if (state.winners.includes(i)) continue;
+      const vs = state.voidSuit[i];
+      if (!vs) continue;
+      const hasVoid = state.hands[i].some(t => t.k === vs);
+      if (hasVoid) flowerPigs.push(i);
+    }
+  }
+
+  // 查大叫：未听牌的玩家
+  const notReady = [];
+  if (state._checkBigCall || state._rain) {
+    for (let i = 0; i < playerCount; i++) {
+      if (state.winners.includes(i)) continue;
+      // 计算手牌（13张 = 总张数 - 明牌张数）
+      const meldTiles = state.melds[i].reduce((s, m) => s + (m.type === 'kong' ? 4 : 3), 0);
+      const handLen = state.hands[i].length - meldTiles;
+      if (handLen === 13) {
+        if (!isReadyHand(state.hands[i], state.melds[i], state.voidSuit[i])) {
+          notReady.push(i);
+        }
+      }
+    }
+  }
+
+  // 花猪赔给所有非花猪未胡玩家：每人 8 分
+  if (flowerPigs.length > 0) {
+    const nonPigs = [];
+    for (let i = 0; i < playerCount; i++) {
+      if (!state.winners.includes(i) && !flowerPigs.includes(i)) nonPigs.push(i);
+    }
+    for (const pig of flowerPigs) {
+      for (const np of nonPigs) {
+        penalties[pig] -= 8;
+        penalties[np] += 8 / Math.max(1, nonPigs.length);
+        details.push({ player: pig, type: '花猪', amount: 8 / Math.max(1, nonPigs.length), to: np });
+      }
+    }
+  }
+
+  // 未听牌赔给听牌玩家
+  if (notReady.length > 0) {
+    const ready = [];
+    for (let i = 0; i < playerCount; i++) {
+      if (state.winners.includes(i) || notReady.includes(i)) continue;
+      ready.push(i);
+    }
+    for (const nr of notReady) {
+      for (const r of ready) {
+        penalties[nr] -= 4;
+        penalties[r] += 4 / Math.max(1, ready.length);
+        details.push({ player: nr, type: '大叫', amount: 4 / Math.max(1, ready.length), to: r });
+      }
+    }
+  }
+
+  return { penalties, details };
+};

@@ -430,12 +430,26 @@ function endOfRound(room) {
     roundScores[winners[w]] = (roundScores[winners[w]] || 0) + scoreInfo.fan;
   }
 
+  // 流局查花猪/查大叫罚分
+  if (gameMod.calculatePenalties) {
+    var penaltyResult = gameMod.calculatePenalties(state);
+    for (var p = 0; p < playerCount; p++) {
+      if (penaltyResult.penalties[p]) {
+        state._penalties[p] = (state._penalties[p] || 0) + penaltyResult.penalties[p];
+      }
+    }
+  }
+
   if (!state.cumulativeScore) state.cumulativeScore = new Array(playerCount).fill(0);
   for (var i = 0; i < playerCount; i++) {
     state.cumulativeScore[i] = (state.cumulativeScore[i] || 0) + roundScores[i];
     // 刮风下雨：杠收入累加到累计分
     if (state._rain && state._gangScore && state._gangScore[i]) {
       state.cumulativeScore[i] += state._gangScore[i];
+    }
+    // 流局罚分累加
+    if (state._penalties && state._penalties[i]) {
+      state.cumulativeScore[i] += state._penalties[i];
     }
   }
 
@@ -447,6 +461,7 @@ function endOfRound(room) {
     roundNumber: state.roundNumber,
     winners: winners,
     gangScore: state._gangScore ? state._gangScore.slice() : new Array(playerCount).fill(0),
+    penalties: penaltyResult ? penaltyResult.details : [],
   });
 }
 

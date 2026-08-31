@@ -396,3 +396,56 @@ test('rain: disabled by default (no gang scoring)', () => {
   assert.equal(s._gangScore[0], 0, 'no gang scoring when rain disabled');
   assert.equal(s._gangScore[1], 0, 'no gang scoring when rain disabled');
 });
+
+// ---- 流局查花猪/查大叫 ----
+
+test('penalties: 查花猪 detects player with void suit tiles', () => {
+  const s = game.createState();
+  s._options = { mahjongMode: 'sichuan', mj_checkFlowerPig: true };
+  game.initGame(s, 4);
+  dealAllVoid(s, ['wan', 'tong', 'tiao', 'wan']);
+  // Simulate round end: deck empty, no winners
+  s.deck = [];
+  s.phase = 'over';
+  // Player 0 still has wan tiles (void=wan) → flower pig
+  s.hands[0] = [
+    t('wan', 1, 7001), t('wan', 2, 7002), t('wan', 3, 7003),
+    t('tong', 1, 7004), t('tong', 2, 7005), t('tong', 3, 7006),
+    t('tiao', 1, 7007), t('tiao', 2, 7008), t('tiao', 3, 7009),
+    t('tiao', 4, 7010), t('tiao', 5, 7011), t('tiao', 6, 7012), t('tiao', 7, 7013),
+  ];
+  // Player 1-3 have no void suit tiles (void=tong/tiao/wan respectively, hands clean)
+  s.hands[1] = [
+    t('wan', 1, 8001), t('wan', 2, 8002), t('wan', 3, 8003),
+    t('tiao', 1, 8004), t('tiao', 2, 8005), t('tiao', 3, 8006),
+    t('tiao', 4, 8007), t('tiao', 5, 8008), t('tiao', 6, 8009),
+    t('tiao', 7, 8010), t('tiao', 8, 8011), t('tiao', 9, 8012), t('wan', 4, 8013),
+  ];
+  s.hands[2] = [
+    t('wan', 1, 8101), t('wan', 2, 8102), t('wan', 3, 8103),
+    t('wan', 4, 8104), t('wan', 5, 8105), t('wan', 6, 8106),
+    t('tong', 1, 8107), t('tong', 2, 8108), t('tong', 3, 8109),
+    t('tong', 4, 8110), t('tong', 5, 8111), t('tong', 6, 8112), t('tong', 7, 8113),
+  ];
+  s.hands[3] = [
+    t('tong', 1, 8201), t('tong', 2, 8202), t('tong', 3, 8203),
+    t('tong', 4, 8204), t('tong', 5, 8205), t('tong', 6, 8206),
+    t('tiao', 1, 8207), t('tiao', 2, 8208), t('tiao', 3, 8209),
+    t('tiao', 4, 8210), t('tiao', 5, 8211), t('tiao', 6, 8212), t('tiao', 7, 8213),
+  ];
+  const result = game.calculatePenalties(s);
+  // Player 0 is flower pig (has wan tiles, void=wan)
+  assert.ok(result.penalties[0] < 0, 'flower pig pays penalty');
+  assert.ok(result.penalties[1] > 0 || result.penalties[2] > 0 || result.penalties[3] > 0, 'non-pigs receive penalty');
+});
+
+test('penalties: no penalties when feature disabled', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  dealAllVoid(s, ['wan', 'tong', 'tiao', 'wan']);
+  s.deck = [];
+  s.phase = 'over';
+  s.hands[0] = [t('wan', 1, 7001), t('wan', 2, 7002), t('wan', 3, 7003), t('tong', 1, 7004), t('tong', 2, 7005), t('tong', 3, 7006), t('tiao', 1, 7007), t('tiao', 2, 7008), t('tiao', 3, 7009), t('tiao', 4, 7010), t('tiao', 5, 7011), t('tiao', 6, 7012), t('tiao', 7, 7013)];
+  const result = game.calculatePenalties(s);
+  assert.equal(result.penalties.every(p => p === 0), true, 'no penalties when disabled');
+});

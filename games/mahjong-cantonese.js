@@ -78,11 +78,20 @@ exports.createState = function () {
     winner: null,       // player index, or -1 = 荒庄
     winInfo: null,      // { type, from, fan }
     claim: null,        // { tile, discarder, order: [players], idx, responses: {} }
+    // Rule flags (read from state._options in initGame)
+    _buyTiles: true,
+    _maxFan: 0,         // 0 = no cap
+    _minFan: 0,         // 0 = no minimum (鸡胡=0番可胡)
   };
 };
 
 exports.initGame = function (state, playerCount) {
   state._playerCount = playerCount;
+  // Read Cantonese rule toggles from options
+  const opt = state._options || {};
+  state._buyTiles = opt.mj_buyTiles !== false; // default true
+  state._maxFan = opt.mj_maxFan || 0; // 0 = no cap
+  state._minFan = opt.mj_minFan || 0; // 0 = no minimum
   const deck = core.buildDeck(CANTONESE);
   state.wall = deck;
   state.hands = [];
@@ -138,17 +147,24 @@ exports.handleMove = function (data, state, playerIndex) {
     if (d.type === 'win') {
       const info = core.huCheck(state.hands[playerIndex], state.melds[playerIndex], CANTONESE);
       if (!info.win) return 'mj_not_winning';
+      var scoreInfo = scoreHand(state.hands[playerIndex], state.melds[playerIndex], info, true, state.wall.length, state);
+      // 起胡番数检查
+      if (state._minFan && state._minFan > 0 && scoreInfo.fan < state._minFan) return 'mj_not_enough_fan';
       state.winner = playerIndex;
-      var scoreInfo = scoreHand(state.hands[playerIndex], state.melds[playerIndex], info, true, state.wall.length);
       state.winInfo = { type: info.type, from: -1, fan: scoreInfo.fan, details: scoreInfo.details };
       // 买码：胡牌后从牌尾买牌加分
-      var buyResult = buyTiles(state, playerIndex);
-      if (buyResult.bonusFan > 0) {
-        state.winInfo.fan += buyResult.bonusFan;
-        state.winInfo.buyDetails = buyResult.details;
+      if (state._buyTiles) {
+        var buyResult = buyTiles(state, playerIndex);
+        if (buyResult.bonusFan > 0) {
+          state.winInfo.fan += buyResult.bonusFan;
+          state.winInfo.buyDetails = buyResult.details;
+        }
+        state.winInfo.buyTiles = buyResult.tiles;
+        state.winInfo.buyFan = buyResult.bonusFan;
+      } else {
+        state.winInfo.buyTiles = [];
+        state.winInfo.buyFan = 0;
       }
-      state.winInfo.buyTiles = buyResult.tiles;
-      state.winInfo.buyFan = buyResult.bonusFan;
       state.phase = 'over';
       return null;
     }
@@ -255,17 +271,24 @@ function resolveClaims(state) {
     const test = state.hands[p].slice();
     test.push(tile);
     const info = core.huCheck(test, state.melds[p], CANTONESE);
+    var scoreInfo = scoreHand(test, state.melds[p], info, false, state.wall.length, state);
+    // 起胡番数检查
+    if (state._minFan && state._minFan > 0 && scoreInfo.fan < state._minFan) return 'mj_not_enough_fan';
     state.winner = p;
-    var scoreInfo = scoreHand(test, state.melds[p], info, false, state.wall.length);
     state.winInfo = { type: info.type, from: claim.discarder, fan: scoreInfo.fan, details: scoreInfo.details };
     // 买码：胡牌后从牌尾买牌加分
-    var buyResult = buyTiles(state, p);
-    if (buyResult.bonusFan > 0) {
-      state.winInfo.fan += buyResult.bonusFan;
-      state.winInfo.buyDetails = buyResult.details;
+    if (state._buyTiles) {
+      var buyResult = buyTiles(state, p);
+      if (buyResult.bonusFan > 0) {
+        state.winInfo.fan += buyResult.bonusFan;
+        state.winInfo.buyDetails = buyResult.details;
+      }
+      state.winInfo.buyTiles = buyResult.tiles;
+      state.winInfo.buyFan = buyResult.bonusFan;
+    } else {
+      state.winInfo.buyTiles = [];
+      state.winInfo.buyFan = 0;
     }
-    state.winInfo.buyTiles = buyResult.tiles;
-    state.winInfo.buyFan = buyResult.bonusFan;
     state.phase = 'over';
     return;
   }
@@ -327,7 +350,7 @@ function resolveClaims(state) {
 //  - core honours-mode returns 清一色 = 4, but rules (and tutorial) = 8
 //  - 平胡 = 1 is the base for a plain hand; 自摸 = +1 always stacks on top
 //  - minimum winning hand = 1 fan
-function scoreHand(hand, melds, winInfo, selfDraw, wallCount) {
+function scoreHand(hand, melds, winInfo, selfDraw, wallCount, state) {
   // Compute pattern fans WITHOUT self-draw (handled separately below).
   var result = core.countFanDetailed(hand, melds, winInfo, CANTONESE, {
     selfDraw: false,
@@ -341,6 +364,11 @@ function scoreHand(hand, melds, winInfo, selfDraw, wallCount) {
   if (result.fan === 0) { result.details.push({ name: '平胡', fan: 1 }); result.fan = 1; }
   // 自摸 always stacks as +1 on top of the base/pattern fans
   if (selfDraw) { result.details.push({ name: '自摸', fan: 1 }); result.fan += 1; }
+  // 封顶
+  if (state && state._maxFan && state._maxFan > 0 && result.fan > state._maxFan) {
+    result.fan = state._maxFan;
+    result.details.push({ name: '封顶', fan: state._maxFan });
+  }
   return result;
 }
 
@@ -398,5 +426,8 @@ exports.playerView = function (state, playerIndex) {
       idx: state.claim.idx,
     } : null,
     _playerCount: state._playerCount,
+    _buyTiles: state._buyTiles,
+    _maxFan: state._maxFan,
+    _minFan: state._minFan,
   };
 };

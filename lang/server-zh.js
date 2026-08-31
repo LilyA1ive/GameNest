@@ -309,6 +309,7 @@ module.exports = {
   'mj_invalid_move': '无效操作',
   'mj_invalid_claim': '无效的吃碰杠操作',
   'mj_last_four_must_win': '最后四张必须胡牌',
+  'mj_not_enough_fan': '番数不够，不能胡牌',
   'mj_choose_swap': '请选择3张同色牌交换',
   'mj_bad_swap': '无效的换牌（需3张同色牌）',
 

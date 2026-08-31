@@ -309,6 +309,7 @@ module.exports = {
   'mj_invalid_move': 'Invalid move',
   'mj_invalid_claim': 'Invalid claim action',
   'mj_last_four_must_win': 'Must win on last 4 tiles',
+  'mj_not_enough_fan': 'Not enough fan to win',
   'mj_choose_swap': 'Select 3 same-suit tiles to swap',
   'mj_bad_swap': 'Invalid swap (need 3 same-suit tiles)',
 

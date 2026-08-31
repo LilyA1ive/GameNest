@@ -843,9 +843,30 @@
               mjToggle('mj_checkBigCall', 'mj_rule_checkBigCall') +
               mjToggle('mj_lastFourAutoWin', 'mj_rule_lastFourAutoWin') +
               mjToggle('mj_swapThree', 'mj_rule_swapThree') +
+            '</div>' : mjMode === 'cantonese' ? '<div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">' +
+              '<div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text-muted);">' + _t('mj_rules_cantonese') + '</div>' +
+              mjToggle('mj_buyTiles', 'mj_rule_buyTiles') +
+              '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:6px;">' +
+                _t('mj_rule_maxFan') + ': ' +
+                '<select onchange="window._setGameOption(\'mj_maxFan\', parseInt(this.value))" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:13px;">' +
+                  '<option value="0"' + (roomOptions.mj_maxFan === 0 || !roomOptions.mj_maxFan ? ' selected' : '') + '>无上限</option>' +
+                  '<option value="3"' + (roomOptions.mj_maxFan === 3 ? ' selected' : '') + '>3番</option>' +
+                  '<option value="4"' + (roomOptions.mj_maxFan === 4 ? ' selected' : '') + '>4番</option>' +
+                  '<option value="5"' + (roomOptions.mj_maxFan === 5 ? ' selected' : '') + '>5番</option>' +
+                '</select>' +
+              '</label>' +
+              '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:6px;">' +
+                _t('mj_rule_minFan') + ': ' +
+                '<select onchange="window._setGameOption(\'mj_minFan\', parseInt(this.value))" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:13px;">' +
+                  '<option value="0"' + (roomOptions.mj_minFan === 0 || !roomOptions.mj_minFan ? ' selected' : '') + '>鸡胡(0番)</option>' +
+                  '<option value="1"' + (roomOptions.mj_minFan === 1 ? ' selected' : '') + '>1番</option>' +
+                  '<option value="3"' + (roomOptions.mj_minFan === 3 ? ' selected' : '') + '>3番</option>' +
+                '</select>' +
+              '</label>' +
             '</div>' : '');
         } else {
           var onOff = function(k) { return (roomOptions[k] === true || roomOptions[k] === 'true') ? '✓' : '—'; };
+          var maxFanLabel = function(v) { return v ? v + '番' : '无上限'; };
           optionsEl.innerHTML =
             '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">' + _t('game_settings') + '</div>' +
             '<div style="font-size:13px;color:var(--text-muted)">' + _t('mahjong_mode') + ': ' +
@@ -858,6 +879,10 @@
               _t('mj_rule_checkBigCall') + ': ' + onOff('mj_checkBigCall') + '<br>' +
               _t('mj_rule_lastFourAutoWin') + ': ' + onOff('mj_lastFourAutoWin') + '<br>' +
               _t('mj_rule_swapThree') + ': ' + onOff('mj_swapThree') +
+            '</div>' : mjMode === 'cantonese' ? '<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.8;">' +
+              _t('mj_rule_buyTiles') + ': ' + onOff('mj_buyTiles') + '<br>' +
+              _t('mj_rule_maxFan') + ': ' + maxFanLabel(roomOptions.mj_maxFan) + '<br>' +
+              _t('mj_rule_minFan') + ': ' + (roomOptions.mj_minFan ? roomOptions.mj_minFan + '番' : '鸡胡(0番)') +
             '</div>' : '');
         }
       } else if (isHost && gameInfo.supportsAI && window._gamesWithDifficulty.indexOf(game) >= 0) {

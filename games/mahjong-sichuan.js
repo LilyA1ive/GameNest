@@ -34,6 +34,7 @@ exports.createState = () => ({
   _multiWinner: false,
   _checkFlowerPig: false,
   _checkBigCall: false,
+  _lastFourAutoWin: false,
   // Gang payment tracking: net points per player from 刮风下雨
   _gangScore: [],
   // Round-end penalty tracking (花猪/查大叫)
@@ -58,6 +59,7 @@ exports.initGame = function (state, playerCount) {
   state._multiWinner = opt.mj_multiWinner === true;
   state._checkFlowerPig = opt.mj_checkFlowerPig === true;
   state._checkBigCall = opt.mj_checkBigCall === true;
+  state._lastFourAutoWin = opt.mj_lastFourAutoWin === true;
 
   const deck = buildDeck(SICHUAN);
   state.deck = deck;
@@ -257,6 +259,12 @@ exports.handleMove = function (data, state, playerIndex) {
     if (!ld) { state.phase = 'play'; }
 
     if (data.type === 'pass') {
+      // 最后四张自动胡：牌墙剩4张时，能胡不能过
+      if (state._lastFourAutoWin && state.deck.length <= 4 && ld) {
+        if (voidSatisfied(state, playerIndex) && checkWin(state, playerIndex, ld)) {
+          return 'mj_last_four_must_win';
+        }
+      }
       state._claimPending = Math.max(0, state._claimPending - 1);
       if (state._claimPending <= 0) {
         // 一炮多响收尾：移除弃牌并推进

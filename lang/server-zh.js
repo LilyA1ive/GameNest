@@ -308,6 +308,7 @@ module.exports = {
   'mj_cannot_chow': '不能吃这张牌',
   'mj_invalid_move': '无效操作',
   'mj_invalid_claim': '无效的吃碰杠操作',
+  'mj_last_four_must_win': '最后四张必须胡牌',
 
   // Sanguosha (sgs_)
   'sgs_sha_limit': '只能出 1 张杀（装备诸葛连弩可无限）',

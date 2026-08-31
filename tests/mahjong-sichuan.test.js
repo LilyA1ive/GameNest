@@ -439,6 +439,41 @@ test('penalties: 查花猪 detects player with void suit tiles', () => {
   assert.ok(result.penalties[1] > 0 || result.penalties[2] > 0 || result.penalties[3] > 0, 'non-pigs receive penalty');
 });
 
+// ---- 最后四张自动胡 ----
+
+test('lastFourAutoWin: must win when deck <= 4 and can win', () => {
+  const s = game.createState();
+  s._options = { mahjongMode: 'sichuan', mj_lastFourAutoWin: true };
+  game.initGame(s, 4);
+  dealAllVoid(s, ['tong', 'tong', 'tong', 'tong']);
+  // Player 0 discards wan:5
+  const w5 = t('wan', 5, 7001);
+  s.hands[0].push(w5);
+  if (s.hands[0].length > 14) s.hands[0].shift();
+  assert.equal(game.handleMove({ type: 'discard', tileId: w5.id }, s, 0), null);
+  // Player 1 has winning hand needing wan:5
+  s.hands[1] = [
+    t('wan', 1, 8001), t('wan', 2, 8002), t('wan', 3, 8003),
+    t('wan', 4, 8004), t('wan', 5, 8005), t('wan', 6, 8006),
+    t('wan', 7, 8007), t('wan', 8, 8008), t('wan', 9, 8009),
+    t('tiao', 1, 8010), t('tiao', 1, 8011),
+    t('wan', 5, 8012), t('wan', 5, 8013),
+  ];
+  // Set deck to 4 tiles
+  s.deck = [t('tong', 9, 9901), t('tong', 9, 9902), t('tong', 9, 9903), t('tong', 9, 9904)];
+  // Player 1 tries to pass → should be rejected
+  const err = game.handleMove({ type: 'pass' }, s, 1);
+  assert.equal(err, 'mj_last_four_must_win', 'cannot pass when can win on last 4');
+  // Player 1 wins → should succeed
+  assert.equal(game.handleMove({ type: 'win' }, s, 1), null);
+});
+
+test('lastFourAutoWin: disabled by default', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  assert.equal(s._lastFourAutoWin, false, 'disabled by default');
+});
+
 test('penalties: no penalties when feature disabled', () => {
   const s = game.createState();
   game.initGame(s, 4);

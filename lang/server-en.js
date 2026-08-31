@@ -308,6 +308,7 @@ module.exports = {
   'mj_cannot_chow': 'Cannot chow this tile',
   'mj_invalid_move': 'Invalid move',
   'mj_invalid_claim': 'Invalid claim action',
+  'mj_last_four_must_win': 'Must win on last 4 tiles',
 
   // Sanguosha (sgs_)
   'sgs_sha_limit': 'Only 1 Slash per turn (unlimited with Crossbow)',

@@ -195,6 +195,11 @@ function countFanDetailed(hand, melds, winInfo, cfg, options) {
   if (options.gangShangHua) details.push({ name: '杠上花', fan: 1 });
 
   var total = details.reduce(function (s, d) { return s + d.fan; }, 0);
+  // 平胡底分：没有任何番种时记 1 分（四川麻将平胡起码 1 番）
+  if (total === 0) {
+    details.push({ name: '平胡', fan: 1 });
+    total = 1;
+  }
   return { fan: total, details: details };
 }
 

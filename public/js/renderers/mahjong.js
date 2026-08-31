@@ -22,6 +22,7 @@
   var _lastDiscardId = null; // 上次弃牌 id（检测变化触发脉冲）
   var _animTimer = null;     // 动画循环句柄
   var _claimEffects = [];    // 碰杠吃胡动画效果 [{ pos, type, text, birth }]
+  var _shownWinners = new Set(); // 已触发过胡牌动画的玩家（避免血战到底反复弹出）
   var _prevMeldCounts = []; // 每家上一帧的明牌数（检测新增）
   var _turnPulse = 0;        // 当前玩家指示脉冲
 
@@ -89,6 +90,8 @@
         _state = state;
         _playerIndex = playerIndex;
         if (!ctx) return;
+        // 新局开始（定缺阶段）→ 重置胡牌动画记录
+        if (state && state.phase === 'void') _shownWinners.clear();
         // 检测新弃牌 → 触发落点脉冲
         var ld = state && state.lastDiscard;
         if (ld && ld.id !== _lastDiscardId) {
@@ -113,12 +116,12 @@
             _prevMeldCounts[i] = cnt;
           }
         }
-        // 胡牌效果
+        // 胡牌效果（仅首次触发，避免血战到底反复弹出）
         if (state && state.winners && state.winners.length > 0) {
           for (var w = 0; w < state.winners.length; w++) {
             var wPlayer = state.winners[w];
-            var alreadyShown = _claimEffects.some(function(e){ return e.player === wPlayer && e.type === 'win'; });
-            if (!alreadyShown) {
+            if (!_shownWinners.has(wPlayer)) {
+              _shownWinners.add(wPlayer);
               _claimEffects.push({ player: wPlayer, type: 'win', label: t('mj_win', '胡') + '!', birth: Date.now() });
             }
           }
@@ -496,6 +499,16 @@
         ctx.lineWidth = 2 + 3 * _lastDiscardPulse;
         var pad = 3 + 6 * _lastDiscardPulse;
         roundRect(x - pad, y - pad, dw + pad * 2, dh + pad * 2, 6);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // 刚出的牌持久高亮外框（亮橙色，区别于 hover 金色）
+      if (isLast) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,140,40,.9)';
+        ctx.lineWidth = 2.5;
+        var lpad = 2;
+        roundRect(x - lpad, y - lpad, dw + lpad * 2, dh + lpad * 2, 5);
         ctx.stroke();
         ctx.restore();
       }

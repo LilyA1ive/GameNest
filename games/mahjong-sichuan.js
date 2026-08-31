@@ -35,6 +35,7 @@ exports.createState = () => ({
   _checkFlowerPig: false,
   _checkBigCall: false,
   _lastFourAutoWin: false,
+  _swapThree: false,
   // Gang payment tracking: net points per player from 刮风下雨
   _gangScore: [],
   // Round-end penalty tracking (花猪/查大叫)
@@ -60,6 +61,7 @@ exports.initGame = function (state, playerCount) {
   state._checkFlowerPig = opt.mj_checkFlowerPig === true;
   state._checkBigCall = opt.mj_checkBigCall === true;
   state._lastFourAutoWin = opt.mj_lastFourAutoWin === true;
+  state._swapThree = opt.mj_swapThree === true;
 
   const deck = buildDeck(SICHUAN);
   state.deck = deck;
@@ -97,7 +99,10 @@ exports.initGame = function (state, playerCount) {
     state.discards.push([]);
   }
 
-  state.phase = 'void';
+  // 换三张：在定缺前增加换牌阶段
+  state.phase = state._swapThree ? 'swap' : 'void';
+  state._swapThree = !!state._swapThree;
+  state._swapSelections = new Array(playerCount).fill(null); // 每家选的牌 id
   state._variants = 'sichuan';
 };
 
@@ -137,6 +142,35 @@ function countSuit(hand, suit) {
   let c = 0;
   for (const t of hand) if (t.k === suit) c++;
   return c;
+}
+
+// 换三张：与对家交换（0↔2, 1↔3）
+function executeSwap(state, playerCount) {
+  const partner = (i) => (i + 2) % playerCount; // 对家
+  for (let i = 0; i < playerCount; i++) {
+    const p = partner(i);
+    if (i >= p) continue; // 只处理一次
+    const selI = state._swapSelections[i] || [];
+    const selP = state._swapSelections[p] || [];
+    if (selI.length !== 3 || selP.length !== 3) continue;
+    // 从手牌取出牌对象
+    const tilesI = [];
+    const tilesP = [];
+    for (const id of selI) {
+      const idx = findTileIndex(state.hands[i], id);
+      if (idx >= 0) tilesI.push(state.hands[i].splice(idx, 1)[0]);
+    }
+    for (const id of selP) {
+      const idx = findTileIndex(state.hands[p], id);
+      if (idx >= 0) tilesP.push(state.hands[p].splice(idx, 1)[0]);
+    }
+    // 交换
+    state.hands[i].push(...tilesP);
+    state.hands[p].push(...tilesI);
+    sortTiles(state.hands[i]);
+    sortTiles(state.hands[p]);
+  }
+  state._swapSelections = [];
 }
 
 // After void chosen by all: dealer (0) begins play, already holding 14.
@@ -232,6 +266,42 @@ exports.handleMove = function (data, state, playerIndex) {
   const playerCount = state.hands.length;
 
   if (!data || !data.type) return 'g_bad_move';
+
+  // ---- Swap phase (换三张) ----
+  if (state.phase === 'swap') {
+    if (data.type !== 'swap') return 'mj_choose_swap';
+    if (state.currentPlayer !== playerIndex) return 'g_not_your_turn';
+    const tileIds = data.tileIds;
+    if (!Array.isArray(tileIds) || tileIds.length !== 3) return 'mj_bad_swap';
+    // 验证3张牌都在手中且同一花色
+    const hand = state.hands[playerIndex];
+    const tilesToSwap = [];
+    const suitCounts = {};
+    for (const id of tileIds) {
+      const idx = findTileIndex(hand, id);
+      if (idx < 0) return 'mj_bad_swap';
+      const tile = hand[idx];
+      if (tile.k === 'feng' || tile.k === 'jian') return 'mj_bad_swap';
+      tilesToSwap.push(tile);
+      suitCounts[tile.k] = (suitCounts[tile.k] || 0) + 1;
+    }
+    // 必须同一花色
+    if (Object.keys(suitCounts).length !== 1) return 'mj_bad_swap';
+    state._swapSelections[playerIndex] = tileIds;
+    // 所有玩家都选完 → 执行交换（与对家换）
+    if (state._swapSelections.every(s => s !== null)) {
+      executeSwap(state, playerCount);
+      state.phase = 'void';
+    } else {
+      // 轮到下一家
+      let next = (playerIndex + 1) % playerCount;
+      while (state._swapSelections[next] !== null) {
+        next = (next + 1) % playerCount;
+      }
+      state.currentPlayer = next;
+    }
+    return null;
+  }
 
   // ---- Void phase ----
   if (state.phase === 'void') {

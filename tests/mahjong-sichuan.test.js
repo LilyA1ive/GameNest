@@ -468,6 +468,60 @@ test('lastFourAutoWin: must win when deck <= 4 and can win', () => {
   assert.equal(game.handleMove({ type: 'win' }, s, 1), null);
 });
 
+// ---- 换三张 ----
+
+test('swapThree: players swap 3 same-suit tiles with partner', () => {
+  const s = game.createState();
+  s._options = { mahjongMode: 'sichuan', mj_swapThree: true };
+  game.initGame(s, 4);
+  assert.equal(s.phase, 'swap', 'starts in swap phase');
+  // Give player 0 three wan tiles and player 2 three tong tiles
+  s.hands[0] = [
+    t('wan', 1, 7001), t('wan', 2, 7002), t('wan', 3, 7003),
+    t('tong', 1, 7004), t('tong', 2, 7005), t('tong', 3, 7006),
+    t('tiao', 1, 7007), t('tiao', 2, 7008), t('tiao', 3, 7009),
+    t('tiao', 4, 7010), t('tiao', 5, 7011), t('tiao', 6, 7012), t('tiao', 7, 7013),
+  ];
+  s.hands[2] = [
+    t('tong', 4, 8001), t('tong', 5, 8002), t('tong', 6, 8003),
+    t('wan', 4, 8004), t('wan', 5, 8005), t('wan', 6, 8006),
+    t('wan', 7, 8007), t('wan', 8, 8008), t('wan', 9, 8009),
+    t('tiao', 1, 8010), t('tiao', 2, 8011), t('tiao', 3, 8012), t('tiao', 4, 8013),
+  ];
+  // Player 0 selects 3 wan tiles
+  assert.equal(game.handleMove({ type: 'swap', tileIds: [7001, 7002, 7003].map((_, i) => 'wan' + (i + 1) + '#700' + (i + 1)) }, s, 0), null);
+  // Player 1 selects 3 tiles (any same suit)
+  s.hands[1] = [
+    t('wan', 1, 7101), t('wan', 2, 7102), t('wan', 3, 7103),
+    t('tong', 1, 7104), t('tong', 2, 7105), t('tong', 3, 7106),
+    t('tiao', 1, 7107), t('tiao', 2, 7108), t('tiao', 3, 7109),
+    t('tiao', 4, 7110), t('tiao', 5, 7111), t('tiao', 6, 7112), t('tiao', 7, 7113),
+  ];
+  assert.equal(game.handleMove({ type: 'swap', tileIds: ['wan1#7101', 'wan2#7102', 'wan3#7103'] }, s, 1), null);
+  // Player 2 selects 3 tong tiles
+  assert.equal(game.handleMove({ type: 'swap', tileIds: ['tong4#8001', 'tong5#8002', 'tong6#8003'] }, s, 2), null);
+  // Player 3 selects 3 tiles
+  s.hands[3] = [
+    t('tong', 7, 8101), t('tong', 8, 8102), t('tong', 9, 8103),
+    t('wan', 1, 8104), t('wan', 2, 8105), t('wan', 3, 8106),
+    t('tiao', 5, 8107), t('tiao', 6, 8108), t('tiao', 7, 8109),
+    t('tiao', 8, 8110), t('tiao', 9, 8111), t('tiao', 1, 8112), t('tiao', 2, 8113),
+  ];
+  assert.equal(game.handleMove({ type: 'swap', tileIds: ['tong7#8101', 'tong8#8102', 'tong9#8103'] }, s, 3), null);
+  // After all swap, phase should be void
+  assert.equal(s.phase, 'void', 'swap complete → void phase');
+  // Player 0 should now have player 2's tong tiles
+  const player0Suits = s.hands[0].map(t => t.k);
+  assert.ok(player0Suits.includes('tong'), 'player 0 received tong tiles from partner');
+});
+
+test('swapThree: disabled by default', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  assert.equal(s._swapThree, false, 'disabled by default');
+  assert.equal(s.phase, 'void', 'starts in void phase');
+});
+
 test('lastFourAutoWin: disabled by default', () => {
   const s = game.createState();
   game.initGame(s, 4);

@@ -327,3 +327,72 @@ test('multi-winner: disabled by default', () => {
   game.initGame(s, 4);
   assert.equal(s._multiWinner, false, 'multi-winner disabled by default');
 });
+
+// ---- 刮风下雨 (gang scoring) ----
+
+test('rain: 直杠 (kong from discard) scores immediately', () => {
+  const s = game.createState();
+  s._options = { mahjongMode: 'sichuan', mj_rain: true };
+  game.initGame(s, 4);
+  assert.equal(s._rain, true, 'rain enabled');
+  dealAllVoid(s, ['wan', 'tong', 'tiao', 'wan']);
+  // Player 0 discards wan:5
+  const w5 = t('wan', 5, 7001);
+  s.hands[0].push(w5);
+  if (s.hands[0].length > 14) s.hands[0].shift();
+  assert.equal(game.handleMove({ type: 'discard', tileId: w5.id }, s, 0), null);
+  // Player 1 has 3x wan:5 and kongs (直杠)
+  s.hands[1] = [
+    t('wan', 5, 9001), t('wan', 5, 9002), t('wan', 5, 9003),
+    t('tong', 1, 9004), t('tong', 2, 9005), t('tong', 3, 9006),
+    t('tong', 4, 9007), t('tong', 5, 9008), t('tong', 6, 9009),
+    t('tiao', 1, 9010), t('tiao', 2, 9011), t('tiao', 3, 9012), t('tiao', 4, 9013),
+  ];
+  assert.equal(game.handleMove({ type: 'kong' }, s, 1), null);
+  // 直杠: player 1 gets +2, player 0 (discarder) gets -2
+  assert.equal(s._gangScore[1], 2, 'kong player gains 2 from 直杠');
+  assert.equal(s._gangScore[0], -2, 'discarder loses 2 from 直杠');
+});
+
+test('rain: 暗杠 (self-kong) scores from all non-winners', () => {
+  const s = game.createState();
+  s._options = { mahjongMode: 'sichuan', mj_rain: true };
+  game.initGame(s, 4);
+  dealAllVoid(s, ['wan', 'tong', 'tiao', 'wan']);
+  // Player 0 has 4x wan:1 and draws, then self-kongs
+  s.hands[0] = [
+    t('wan', 1, 8001), t('wan', 1, 8002), t('wan', 1, 8003), t('wan', 1, 8004),
+    t('tong', 2, 8005), t('tong', 3, 8006), t('tong', 4, 8007),
+    t('tiao', 1, 8008), t('tiao', 2, 8009), t('tiao', 3, 8010),
+    t('tiao', 5, 8011), t('tiao', 6, 8012), t('tiao', 7, 8013), t('tiao', 8, 8014),
+  ];
+  s.phase = 'play';
+  s.currentPlayer = 0;
+  s.drawn = s.hands[0][13].id;
+  assert.equal(game.handleMove({ type: 'selfkong', suit: 'wan', num: 1 }, s, 0), null);
+  // 暗杠: player 0 gets +2 from each of 3 non-winners = +6
+  assert.equal(s._gangScore[0], 6, 'self-kong gains 2 from each non-winner');
+  assert.equal(s._gangScore[1], -2);
+  assert.equal(s._gangScore[2], -2);
+  assert.equal(s._gangScore[3], -2);
+});
+
+test('rain: disabled by default (no gang scoring)', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  assert.equal(s._rain, false, 'rain disabled by default');
+  dealAllVoid(s, ['wan', 'tong', 'tiao', 'wan']);
+  const w5 = t('wan', 5, 7001);
+  s.hands[0].push(w5);
+  if (s.hands[0].length > 14) s.hands[0].shift();
+  assert.equal(game.handleMove({ type: 'discard', tileId: w5.id }, s, 0), null);
+  s.hands[1] = [
+    t('wan', 5, 9001), t('wan', 5, 9002), t('wan', 5, 9003),
+    t('tong', 1, 9004), t('tong', 2, 9005), t('tong', 3, 9006),
+    t('tong', 4, 9007), t('tong', 5, 9008), t('tong', 6, 9009),
+    t('tiao', 1, 9010), t('tiao', 2, 9011), t('tiao', 3, 9012), t('tiao', 4, 9013),
+  ];
+  assert.equal(game.handleMove({ type: 'kong' }, s, 1), null);
+  assert.equal(s._gangScore[0], 0, 'no gang scoring when rain disabled');
+  assert.equal(s._gangScore[1], 0, 'no gang scoring when rain disabled');
+});

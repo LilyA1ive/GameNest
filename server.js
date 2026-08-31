@@ -136,6 +136,61 @@ app.get('/network-info', (req, res) => {
   });
 });
 
+// Debug: list active rooms (no sensitive hand data)
+app.get('/api/debug/rooms', (req, res) => {
+  const list = [];
+  for (const [id, room] of rooms) {
+    list.push({
+      id,
+      game: room.game,
+      phase: room.state && room.state.phase,
+      playerCount: room.players.size,
+      botCount: room.bots ? room.bots.size : 0,
+      winners: room.state && room.state.winners,
+      cumulativeScore: room.state && room.state.cumulativeScore,
+      roundNumber: room.state && room.state.roundNumber,
+    });
+  }
+  res.json({ rooms: list });
+});
+
+// Debug: dump full room state for a given roomId (includes hands & scoring)
+app.get('/api/debug/room/:roomId', (req, res) => {
+  const room = rooms.get(req.params.roomId);
+  if (!room) return res.json({ error: 'room not found' });
+  const state = room.state;
+  const gameMod = gameRegistry[room.game];
+  const dump = {
+    id: room._roomId,
+    game: room.game,
+    phase: state.phase,
+    currentPlayer: state.currentPlayer,
+    winners: state.winners,
+    cumulativeScore: state.cumulativeScore,
+    roundNumber: state.roundNumber,
+    dealerIndex: state.dealerIndex,
+    deckCount: state.deck.length,
+    voidSuit: state.voidSuit,
+    _winSelfDraw: state._winSelfDraw,
+    hands: state.hands,
+    melds: state.melds,
+    discards: state.discards,
+    lastDiscard: state.lastDiscard,
+  };
+  // Attach per-winner score breakdown if winners exist
+  if (gameMod && gameMod.calculateScore && state.winners && state.winners.length > 0) {
+    dump.winnerScores = {};
+    for (const w of state.winners) {
+      try {
+        dump.winnerScores[w] = gameMod.calculateScore(state, w);
+      } catch (e) {
+        dump.winnerScores[w] = { error: e.message };
+      }
+    }
+  }
+  res.json(dump);
+});
+
 logStep('[android-node] server.js init http/ws server');
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -378,6 +433,10 @@ function endOfRound(room) {
   if (!state.cumulativeScore) state.cumulativeScore = new Array(playerCount).fill(0);
   for (var i = 0; i < playerCount; i++) {
     state.cumulativeScore[i] = (state.cumulativeScore[i] || 0) + roundScores[i];
+    // 刮风下雨：杠收入累加到累计分
+    if (state._rain && state._gangScore && state._gangScore[i]) {
+      state.cumulativeScore[i] += state._gangScore[i];
+    }
   }
 
   broadcastRoom(room, {
@@ -387,6 +446,7 @@ function endOfRound(room) {
     dealerIndex: state.dealerIndex,
     roundNumber: state.roundNumber,
     winners: winners,
+    gangScore: state._gangScore ? state._gangScore.slice() : new Array(playerCount).fill(0),
   });
 }
 
@@ -1062,10 +1122,53 @@ wss.on('connection', (ws) => {
       const playerInfo = currentRoom.players.get(ws);
       if (!playerInfo) return;
 
+      // --- Generic event logging: capture key state transitions for debugging ---
+      const _prevPhase = currentRoom.state.phase;
+      const _prevWinners = (currentRoom.state.winners && currentRoom.state.winners.slice()) || [];
+      const _prevCP = currentRoom.state.currentPlayer;
+      const _prevMeldCount = currentRoom.state.melds
+        ? currentRoom.state.melds.reduce((s, m) => s + (m ? m.length : 0), 0)
+        : 0;
+
       const err = gameMod.handleMove(data, currentRoom.state, playerInfo.index);
       if (err) {
         ws.send(JSON.stringify({ type: 'error', message: serverT(currentRoom, err), code: err }));
         return;
+      }
+
+      const _st = currentRoom.state;
+      // 1) Phase change (any game)
+      if (_st.phase !== _prevPhase) {
+        console.log('[game-event] room=' + currentRoom._roomId + ' game=' + currentRoom.game +
+          ' phase: ' + _prevPhase + ' → ' + _st.phase +
+          ' | by player=' + playerInfo.index + ' move=' + data.type);
+      }
+      // 2) Winner(s) added (mahjong blood-battle, etc.)
+      const _newWinners = _st.winners || [];
+      if (_newWinners.length > _prevWinners.length) {
+        const _w = _newWinners[_newWinners.length - 1];
+        let _score = null;
+        try { if (gameMod.calculateScore) _score = gameMod.calculateScore(_st, _w); } catch (e) {}
+        console.log('[game-event] room=' + currentRoom._roomId + ' game=' + currentRoom.game +
+          ' WINNER player=' + _w +
+          ' | selfDraw=' + !!(_st._winSelfDraw && _st._winSelfDraw[_w]) +
+          ' | fan=' + (_score ? _score.fan : 'n/a') +
+          ' | details=' + (_score ? JSON.stringify(_score.details) : '-') +
+          ' | totalWinners=' + _newWinners.length);
+      }
+      // 3) Round / game over
+      if (_st.phase === 'over' && _prevPhase !== 'over') {
+        console.log('[game-event] room=' + currentRoom._roomId + ' game=' + currentRoom.game +
+          ' ROUND_OVER | winners=' + JSON.stringify(_newWinners) +
+          ' | cumulativeScore=' + JSON.stringify(_st.cumulativeScore));
+      }
+      // 4) Meld added (pung/kong/chow) — detect via total meld count increase
+      const _newMeldCount = _st.melds
+        ? _st.melds.reduce((s, m) => s + (m ? m.length : 0), 0)
+        : 0;
+      if (_newMeldCount > _prevMeldCount && _prevCP === playerInfo.index) {
+        console.log('[game-event] room=' + currentRoom._roomId + ' game=' + currentRoom.game +
+          ' MELD by player=' + playerInfo.index + ' move=' + data.type);
       }
 
       skipDisconnectedTurn(currentRoom);

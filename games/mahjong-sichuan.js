@@ -318,7 +318,12 @@ exports.handleMove = function (data, state, playerIndex) {
       removeTileFromHand(state, playerIndex, suit, num);
       removeTileFromHand(state, playerIndex, suit, num);
       removeDiscard(state, state._lastDiscardFrom, ld.id);
-      state.melds[playerIndex].push({ type: 'kong', tile: { k: suit, n: num }, tiles: [ld] });
+      state.melds[playerIndex].push({ type: 'kong', tile: { k: suit, n: num }, tiles: [ld], from: state._lastDiscardFrom });
+      // 刮风下雨：直杠（点杠）收引杠者 2 分
+      if (state._rain && state._lastDiscardFrom >= 0 && state._lastDiscardFrom !== playerIndex) {
+        state._gangScore[playerIndex] = (state._gangScore[playerIndex] || 0) + 2;
+        state._gangScore[state._lastDiscardFrom] = (state._gangScore[state._lastDiscardFrom] || 0) - 2;
+      }
       // Kong draws a replacement tile
       if (state.deck.length > 0) {
         const rep = state.deck.pop();
@@ -347,6 +352,40 @@ exports.handleMove = function (data, state, playerIndex) {
       if (!info) return 'mj_not_winning';
       state._winSelfDraw[playerIndex] = true;
       registerWin(state, playerIndex);
+      return null;
+    }
+
+    // 暗杠（下雨）：手中有4张相同牌，在自己回合杠出
+    if (data.type === 'selfkong') {
+      const suit = data.suit, num = data.num;
+      // 验证手中有4张
+      let removed = 0;
+      for (let i = state.hands[playerIndex].length - 1; i >= 0 && removed < 4; i--) {
+        if (state.hands[playerIndex][i].k === suit && state.hands[playerIndex][i].n === num) {
+          state.hands[playerIndex].splice(i, 1);
+          removed++;
+        }
+      }
+      if (removed < 4) return 'mj_cannot_kong';
+      state.melds[playerIndex].push({ type: 'kong', tile: { k: suit, n: num }, tiles: [], from: playerIndex });
+      // 刮风下雨：暗杠收所有未胡者 2 分
+      if (state._rain) {
+        for (let p = 0; p < state.hands.length; p++) {
+          if (p !== playerIndex && !state.winners.includes(p)) {
+            state._gangScore[playerIndex] = (state._gangScore[playerIndex] || 0) + 2;
+            state._gangScore[p] = (state._gangScore[p] || 0) - 2;
+          }
+        }
+      }
+      // 摸补牌
+      if (state.deck.length > 0) {
+        const rep = state.deck.pop();
+        state.hands[playerIndex].push(rep);
+        sortTiles(state.hands[playerIndex]);
+        state.drawn = rep.id;
+      }
+      state.phase = 'play';
+      state.lastDiscard = null;
       return null;
     }
 

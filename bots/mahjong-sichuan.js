@@ -27,6 +27,11 @@ exports.createBot = (playerIndex) => {
     const voidSuit = state.voidSuit[playerIndex];
     const phase = state.phase;
 
+    // Swap phase (换三张): select 3 same-suit tiles to swap.
+    if (phase === 'swap') {
+      return { type: 'swap', tileIds: chooseSwapTiles(hand) };
+    }
+
     // Void phase: pick the suit we have the fewest of (easy to discard).
     if (phase === 'void') {
       return { type: 'void', suit: chooseVoid(hand) };
@@ -44,6 +49,13 @@ exports.createBot = (playerIndex) => {
       if (info && info.win) {
         if (voidSatisfied(hand, voidSuit)) {
           return { type: 'win' };
+        }
+      }
+      // Self-kong (暗杠): if we have 4 identical tiles and rain is on
+      if (state._rain) {
+        const selfKong = chooseSelfKong(hand);
+        if (selfKong) {
+          return { type: 'selfkong', suit: selfKong.k, num: selfKong.n };
         }
       }
       return { type: 'discard', tileId: chooseDiscard(hand, voidSuit) };
@@ -101,6 +113,38 @@ function chooseDiscard(hand, voidSuit) {
     if (score < bestScore) { bestScore = score; best = tile; }
   }
   return best.id;
+}
+
+// 换三张：选3张同色牌（优先选数目最多的花色中的孤张）
+function chooseSwapTiles(hand) {
+  const suits = ['wan', 'tong', 'tiao'];
+  // 找数目最多的花色
+  let bestSuit = suits[0], bestCount = 0;
+  for (const s of suits) {
+    const c = countSuit(hand, s);
+    if (c > bestCount) { bestCount = c; bestSuit = s; }
+  }
+  // 从该花色中选3张（优先孤张/边张）
+  const suitTiles = hand.filter(t => t.k === bestSuit);
+  // 按连接度排序，选最不重要的3张
+  suitTiles.sort((a, b) => tileConnectivity(hand, a) - tileConnectivity(hand, b));
+  return suitTiles.slice(0, 3).map(t => t.id);
+}
+
+// 暗杠：找手中有4张相同的牌
+function chooseSelfKong(hand) {
+  const counts = {};
+  for (const t of hand) {
+    const key = t.k + ':' + t.n;
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  for (const key in counts) {
+    if (counts[key] === 4) {
+      const parts = key.split(':');
+      return { k: parts[0], n: parseInt(parts[1]) };
+    }
+  }
+  return null;
 }
 
 function claimDecision(state, playerIndex, hand, melds) {

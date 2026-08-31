@@ -817,20 +817,48 @@
       } else if (game === 'mahjong-sichuan') {
         optionsEl.style.display = 'block';
         var mjMode = roomOptions.mahjongMode || 'sichuan';
+        // Helper: build a toggle checkbox line
+        function mjToggle(key, labelKey) {
+          var checked = roomOptions[key] === true || roomOptions[key] === 'true';
+          return '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:6px;">' +
+            '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="window._setGameOption(\'' + key + '\', this.checked)" style="width:16px;height:16px;cursor:pointer;">' +
+            _t(labelKey) +
+            '</label>';
+        }
         if (isHost) {
           optionsEl.innerHTML =
             '<div style="font-size:13px;font-weight:600;margin-bottom:8px;">' + _t('game_settings') + '</div>' +
-            '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;">' +
+            '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;margin-bottom:10px;">' +
               _t('mahjong_mode') + ': <select onchange="window._setGameOption(\'mahjongMode\', this.value)" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:14px;">' +
                 '<option value="sichuan"' + (mjMode === 'sichuan' ? ' selected' : '') + '>' + _t('mahjong_mode_sichuan') + '</option>' +
                 '<option value="cantonese"' + (mjMode === 'cantonese' ? ' selected' : '') + '>' + _t('mahjong_mode_cantonese') + '</option>' +
               '</select>' +
-            '</label>';
+            '</label>' +
+            (mjMode === 'sichuan' ? '<div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">' +
+              '<div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text-muted);">' + _t('mj_rules_title') + '</div>' +
+              mjToggle('mj_bloodBattle', 'mj_rule_bloodBattle') +
+              mjToggle('mj_multiWinner', 'mj_rule_multiWinner') +
+              mjToggle('mj_rain', 'mj_rule_rain') +
+              mjToggle('mj_checkFlowerPig', 'mj_rule_checkFlowerPig') +
+              mjToggle('mj_checkBigCall', 'mj_rule_checkBigCall') +
+              mjToggle('mj_lastFourAutoWin', 'mj_rule_lastFourAutoWin') +
+              mjToggle('mj_swapThree', 'mj_rule_swapThree') +
+            '</div>' : '');
         } else {
+          var onOff = function(k) { return (roomOptions[k] === true || roomOptions[k] === 'true') ? '✓' : '—'; };
           optionsEl.innerHTML =
             '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">' + _t('game_settings') + '</div>' +
             '<div style="font-size:13px;color:var(--text-muted)">' + _t('mahjong_mode') + ': ' +
-              (mjMode === 'cantonese' ? _t('mahjong_mode_cantonese') : _t('mahjong_mode_sichuan')) + '</div>';
+              (mjMode === 'cantonese' ? _t('mahjong_mode_cantonese') : _t('mahjong_mode_sichuan')) + '</div>' +
+            (mjMode === 'sichuan' ? '<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.8;">' +
+              _t('mj_rule_bloodBattle') + ': ' + onOff('mj_bloodBattle') + '<br>' +
+              _t('mj_rule_multiWinner') + ': ' + onOff('mj_multiWinner') + '<br>' +
+              _t('mj_rule_rain') + ': ' + onOff('mj_rain') + '<br>' +
+              _t('mj_rule_checkFlowerPig') + ': ' + onOff('mj_checkFlowerPig') + '<br>' +
+              _t('mj_rule_checkBigCall') + ': ' + onOff('mj_checkBigCall') + '<br>' +
+              _t('mj_rule_lastFourAutoWin') + ': ' + onOff('mj_lastFourAutoWin') + '<br>' +
+              _t('mj_rule_swapThree') + ': ' + onOff('mj_swapThree') +
+            '</div>' : '');
         }
       } else if (isHost && gameInfo.supportsAI && window._gamesWithDifficulty.indexOf(game) >= 0) {
         // AI difficulty selector only for games whose bots actually read it

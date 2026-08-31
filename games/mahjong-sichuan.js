@@ -178,8 +178,32 @@ function checkWin(state, playerIndex, extraTile) {
   return res && res.win ? res : null;
 }
 
+// 一炮多响收尾：所有玩家响应完毕后，移除弃牌并推进
+function finishMultiWinnerClaim(state, playerCount) {
+  // 移除被胡的弃牌（只移除一张，即使多家胡）
+  removeDiscard(state, state._lastDiscardFrom, state.lastDiscard ? state.lastDiscard.id : null);
+  state._multiWinClaimants = [];
+  // 推进：血战模式继续，非血战则已结束（registerWin 已设 over）
+  if (state.phase === 'claim') {
+    if (state.winners.length > 0 && state.deck.length === 0) {
+      state.phase = 'over';
+    } else if (!advanceTurn(state, playerCount)) {
+      // deck empty → over
+    }
+  }
+}
+
 function registerWin(state, playerIndex) {
   if (!state.winners.includes(playerIndex)) state.winners.push(playerIndex);
+  // 一炮多响模式：不立即推进，等所有玩家响应完毕
+  if (state._multiWinner) {
+    // 仅记录赢家，phase 推进由 finishMultiWinnerClaim 处理
+    // 但如果非血战模式，最后一家胡了就直接结束
+    if (!state._bloodBattle) {
+      state.phase = 'over';
+    }
+    return;
+  }
   // Non-blood-battle: one win ends the round immediately
   if (!state._bloodBattle) {
     state.phase = 'over';
@@ -231,8 +255,10 @@ exports.handleMove = function (data, state, playerIndex) {
     if (data.type === 'pass') {
       state._claimPending = Math.max(0, state._claimPending - 1);
       if (state._claimPending <= 0) {
-        // No claimants left; if a winner was registered during blood battle, handle
-        if (state.winners.length > 0 && state.deck.length === 0) {
+        // 一炮多响收尾：移除弃牌并推进
+        if (state._multiWinner && state._multiWinClaimants && state._multiWinClaimants.length > 0) {
+          finishMultiWinnerClaim(state, playerCount);
+        } else if (state.winners.length > 0 && state.deck.length === 0) {
           state.phase = 'over';
         } else if (!advanceTurn(state, playerCount)) {
           return null;
@@ -246,13 +272,26 @@ exports.handleMove = function (data, state, playerIndex) {
       if (!voidSatisfied(state, playerIndex)) return 'mj_void_not_satisfied';
       const info = checkWin(state, playerIndex, ld);
       if (!info) return 'mj_not_winning';
-      // remove the claimed discard from its owner's discard pile
-      removeDiscard(state, state._lastDiscardFrom, ld.id);
       // 把胡牌张加入手牌，保证计分（清一色/七对等）基于完整14张
       state.hands[playerIndex].push({ k: ld.k, n: ld.n, id: ld.id });
       sortTiles(state.hands[playerIndex]);
       state._winSelfDraw[playerIndex] = false;
       registerWin(state, playerIndex);
+
+      if (state._multiWinner) {
+        // 一炮多响: 不立即移除弃牌，允许其他玩家也胡这张牌
+        state._claimPending = Math.max(0, state._claimPending - 1);
+        // 记录已胡的玩家（用于后续移除弃牌）
+        state._multiWinClaimants = state._multiWinClaimants || [];
+        state._multiWinClaimants.push(playerIndex);
+        if (state._claimPending <= 0) {
+          // 所有玩家都已响应，移除弃牌并继续
+          finishMultiWinnerClaim(state, playerCount);
+        }
+      } else {
+        // 标准模式：移除弃牌，结束 claim 阶段
+        removeDiscard(state, state._lastDiscardFrom, ld.id);
+      }
       return null;
     }
 
@@ -325,6 +364,7 @@ exports.handleMove = function (data, state, playerIndex) {
       // Enter claim phase: other players may pung/kong/win
       state.phase = 'claim';
       state._claimPending = playerCount - 1;
+      state._multiWinClaimants = []; // 一炮多响：记录已胡玩家
       return null;
     }
 

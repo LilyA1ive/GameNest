@@ -279,3 +279,51 @@ test('blood battle: enabled by default', () => {
   game.initGame(s, 4);
   assert.equal(s._bloodBattle, true, 'default is blood battle');
 });
+
+// ---- multi-winner (一炮多响) ----
+
+test('multi-winner: two players can win from same discard', () => {
+  const s = game.createState();
+  s._options = { mahjongMode: 'sichuan', mj_multiWinner: true, mj_bloodBattle: true };
+  game.initGame(s, 4);
+  assert.equal(s._multiWinner, true, 'multi-winner enabled');
+  dealAllVoid(s, ['tong', 'tong', 'tong', 'tong']);
+  // Player 0 discards a wan:5
+  const discardTile = t('wan', 5, 7001);
+  s.hands[0].push(discardTile);
+  if (s.hands[0].length > 14) s.hands[0].shift();
+  assert.equal(game.handleMove({ type: 'discard', tileId: discardTile.id }, s, 0), null);
+  assert.equal(s.phase, 'claim');
+  // Player 1 and Player 2 both have winning hands that need wan:5
+  // Void suit is 'tong' for all, so hands must only use wan + tiao
+  // Build: 123wan 456wan 789wan 11tiao + wan:5 = 14 tiles, wins with wan:5
+  function winningHandNeeding() {
+    return [
+      t('wan', 1, 8001), t('wan', 2, 8002), t('wan', 3, 8003),
+      t('wan', 4, 8004), t('wan', 5, 8005), t('wan', 6, 8006),
+      t('wan', 7, 8007), t('wan', 8, 8008), t('wan', 9, 8009),
+      t('tiao', 1, 8010), t('tiao', 1, 8011),
+      t('wan', 5, 8012), t('wan', 5, 8013),
+    ];
+  }
+  s.hands[1] = winningHandNeeding();
+  s.hands[2] = winningHandNeeding();
+  // Player 1 wins
+  assert.equal(game.handleMove({ type: 'win' }, s, 1), null);
+  assert.ok(s.winners.includes(1));
+  // In multi-winner mode, claim phase continues
+  assert.equal(s.phase, 'claim', 'claim phase continues for other winners');
+  // Player 2 also wins
+  assert.equal(game.handleMove({ type: 'win' }, s, 2), null);
+  assert.ok(s.winners.includes(2));
+  // Player 3 passes → claim phase ends
+  assert.equal(game.handleMove({ type: 'pass' }, s, 3), null);
+  // Both winners recorded
+  assert.ok(s.winners.includes(1) && s.winners.includes(2));
+});
+
+test('multi-winner: disabled by default', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  assert.equal(s._multiWinner, false, 'multi-winner disabled by default');
+});

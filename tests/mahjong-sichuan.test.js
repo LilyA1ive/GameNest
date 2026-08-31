@@ -254,3 +254,28 @@ test('blood battle: a second player can still win after first winner', () => {
   assert.equal(game.handleMove({ type: 'win' }, s, 1), null);
   assert.ok(s.winners.includes(1));
 });
+
+// ---- non-blood-battle: one win ends the round ----
+
+test('non-blood-battle: single win ends the round immediately', () => {
+  const s = game.createState();
+  // Inject options before initGame
+  s._options = { mahjongMode: 'sichuan', mj_bloodBattle: false };
+  game.initGame(s, 4);
+  assert.equal(s._bloodBattle, false, 'blood battle disabled via option');
+  dealAllVoid(s, ['tong', 'tong', 'tong', 'tong']);
+  // Player 0 wins
+  s.hands[0] = winningHand();
+  s.phase = 'play';
+  s.currentPlayer = 0;
+  s.drawn = s.hands[0][13].id;
+  assert.equal(game.handleMove({ type: 'win' }, s, 0), null);
+  assert.ok(s.winners.includes(0));
+  assert.equal(s.phase, 'over', 'round ends immediately in non-blood-battle mode');
+});
+
+test('blood battle: enabled by default', () => {
+  const s = game.createState();
+  game.initGame(s, 4);
+  assert.equal(s._bloodBattle, true, 'default is blood battle');
+});

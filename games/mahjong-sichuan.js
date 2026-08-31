@@ -28,6 +28,14 @@ exports.createState = () => ({
   _claimPending: 0,
   _variants: 'sichuan',
   _winSelfDraw: {},
+  // Rule flags (read from state._options in initGame)
+  _bloodBattle: true,
+  _rain: false,
+  _multiWinner: false,
+  // Gang payment tracking: net points per player from 刮风下雨
+  _gangScore: [],
+  // Round-end penalty tracking (花猪/查大叫)
+  _penalties: [],
 });
 
 // Unified entry: room.game stays 'mahjong-sichuan', but the actual ruleset is
@@ -40,6 +48,12 @@ exports.initGame = function (state, playerCount) {
     switchToCantonese(state, playerCount);
     return;
   }
+
+  // Read Sichuan rule toggles from options (default: blood battle on, others off)
+  const opt = state._options || {};
+  state._bloodBattle = opt.mj_bloodBattle !== false; // default true
+  state._rain = opt.mj_rain === true;
+  state._multiWinner = opt.mj_multiWinner === true;
 
   const deck = buildDeck(SICHUAN);
   state.deck = deck;
@@ -55,6 +69,8 @@ exports.initGame = function (state, playerCount) {
   state._claimPending = 0;
   state.guessCount = new Array(playerCount).fill(0);
   state._winSelfDraw = {};
+  state._gangScore = new Array(playerCount).fill(0);
+  state._penalties = new Array(playerCount).fill(0);
   state.currentPlayer = 0;
 
   const hands = [];
@@ -164,6 +180,12 @@ function checkWin(state, playerIndex, extraTile) {
 
 function registerWin(state, playerIndex) {
   if (!state.winners.includes(playerIndex)) state.winners.push(playerIndex);
+  // Non-blood-battle: one win ends the round immediately
+  if (!state._bloodBattle) {
+    state.phase = 'over';
+    return;
+  }
+  // Blood battle: continue until 3 winners or deck empty
   if (state.winners.length >= 3 || state.deck.length === 0) {
     state.phase = 'over';
   } else {
@@ -382,6 +404,11 @@ exports.playerView = function (state, playerIndex) {
     winners: state.winners,
     guessCount: state.guessCount,
     deckCount: state.deck.length,
+    _bloodBattle: state._bloodBattle,
+    _rain: state._rain,
+    _multiWinner: state._multiWinner,
+    _gangScore: state._gangScore,
+    _penalties: state._penalties,
   };
 };
 

@@ -169,7 +169,8 @@
         { h: '怎么碰牌', p: '别人打出的牌，你手里有2张相同 → 可以碰。碰后组成3张刻子亮在面前，然后立即出牌。碰对所有花色有效（包括字牌）。' },
         { h: '怎么杠牌', p: '暗杠：自己摸到4张相同；明杠：手里有3张别人打出第4张；补杠：碰后摸到第4张。杠后从牌尾补一张。杠上开花+1番。' },
         { h: '怎么胡牌', p: '自摸或点炮。胡牌公式：4组面子+1对将。七对也可胡。' },
-        { h: '番种', p: '平胡1番起算、自摸+1、混一色+2、对对和+2、清一色+8。' },
+        { h: '番种', p: '平胡1番起算、自摸+1、混一色+2、对对和+2、清一色+8、大三元+8、大四喜+8、十三幺+8。可选规则：红中百搭（红中可当万能牌）+1番。' },
+        { h: '特殊番型', p: '大三元：中发白三组刻子。大四喜：东南西北四组刻子。十三幺：13种幺九字牌各1张+任1张成对。这些番型无需满足标准4面子+1对结构即可胡牌。' },
         { h: '买码', p: '胡牌后自动从牌尾买4张牌。买中的字牌（风牌：东南西北；箭牌：中发白）每张额外+1番。买码在胡牌后自动进行。' },
         { h: '获胜策略', p: '鸡平胡节奏快，优先听牌；注意保留中张（4-6），边张（1/9）难组搭；观察对手吃碰判断其牌型；有胡就胡，不要贪大番。' },
       ]
@@ -496,7 +497,8 @@
         { h: 'How to Pung', p: 'Discard matches a pair in your hand → Pung to make triplet. Must discard immediately. Works for all tiles including honours.' },
         { h: 'How to Kong', p: 'Concealed: draw all 4. Exposed: have 3, opponent discards 4th. Added: pung then draw 4th. Draw replacement from wall. 杠上花 (win on replacement) +1 fan.' },
         { h: 'How to Win', p: 'Self-draw or claim discard. Formula: 4 melds + 1 pair. Seven Pairs also wins.' },
-        { h: 'Fan Types', p: '平胡 1 fan base, 自摸 +1, 混一色 +2, 对对和 +2, 清一色 +8.' },
+        { h: 'Fan Types', p: '平胡 1 fan base, 自摸 +1, 混一色 +2, 对对和 +2, 清一色 +8, 大三元 +8, 大四喜 +8, 十三幺 +8. Optional: 红中百搭 (Red Dragon Wild) +1 fan.' },
+        { h: 'Special Hands', p: '大三元: three pungs of 中发白. 大四喜: four pungs of 东南西北. 十三幺: one of each terminal/honour tile (13 types) + one paired. These bypass the standard 4-meld+pair structure.' },
         { h: 'Buy Tiles (买码)', p: 'After winning, automatically buy 4 tiles from the wall tail. Each honour tile hit — winds (东南西北) or dragons (中发白) — scores +1 fan bonus. The deck has no flower tiles.' },
         { h: 'Winning Strategy', p: 'Fast-paced — prioritize reaching ready status; keep middle tiles (4-6), edge tiles (1/9) are hard to use; watch opponents\' chows/pungs to deduce their hands; don\'t greed for big fans — win when you can.' },
       ]

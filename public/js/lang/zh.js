@@ -218,6 +218,8 @@
     'mj_rules_cantonese': '广东麻将规则',
     'mj_rule_buyTiles': '买码（胡牌后买牌加分）',
     'mj_rule_buyTiles_desc': '胡牌后从牌尾买牌，中的每张加番',
+    'mj_rule_wildcard': '红中百搭',
+    'mj_rule_wildcard_desc': '红中（中）可当万能牌使用，替代任意牌凑面子/对子',
     'mj_rule_maxFan': '封顶番数',
     'mj_rule_minFan': '起胡番数',
     'random_boards': '各自随机',

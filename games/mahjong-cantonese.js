@@ -10,6 +10,14 @@
 const core = require('./lib/mahjong-core');
 const CANTONESE = core.CANTONESE;
 
+// 构建含百搭的配置（广东麻将可选规则：红中=万能百搭）
+function getCfg(state) {
+  if (state && state._wildcard) {
+    return { ...CANTONESE, wildcard: { k: 'jian', n: 1 } };
+  }
+  return CANTONESE;
+}
+
 exports.name = 'mahjong-cantonese';
 exports.maxPlayers = 4;
 exports.minPlayers = 2;
@@ -50,7 +58,7 @@ function findChowPairs(hand, tile) {
 function canWinWith(state, player, tile) {
   const test = state.hands[player].slice();
   test.push(tile);
-  return core.huCheck(test, state.melds[player], CANTONESE).win;
+  return core.huCheck(test, state.melds[player], getCfg(state)).win;
 }
 
 // Determine which claim types `player` can perform on `tile` (discarded by `discarder`).
@@ -93,6 +101,7 @@ exports.initGame = function (state, playerCount) {
   state._buyTiles = opt.mj_buyTiles !== false; // default true
   state._maxFan = opt.mj_maxFan || 0; // 0 = no cap
   state._minFan = opt.mj_minFan || 0; // 0 = no minimum
+  state._wildcard = opt.mj_wildcard === true; // 红中百搭（默认关闭）
   // Server writes the next dealer into state.dealerIndex before initGame. Use it
   // to extend the deal and set the starting player; fall back to 0 for round 1.
   const dealer = state.dealerIndex || 0;
@@ -154,7 +163,7 @@ exports.handleMove = function (data, state, playerIndex) {
 
     // self-draw win
     if (d.type === 'win') {
-      const info = core.huCheck(state.hands[playerIndex], state.melds[playerIndex], CANTONESE);
+      const info = core.huCheck(state.hands[playerIndex], state.melds[playerIndex], getCfg(state));
       if (!info.win) return 'mj_not_winning';
       var scoreInfo = scoreHand(state.hands[playerIndex], state.melds[playerIndex], info, true, state.wall.length, state, state._gangShangHua);
       // 起胡番数检查
@@ -333,7 +342,7 @@ function resolveClaims(state) {
     const p = best.player;
     const test = state.hands[p].slice();
     test.push(tile);
-    const info = core.huCheck(test, state.melds[p], CANTONESE);
+    const info = core.huCheck(test, state.melds[p], getCfg(state));
     var scoreInfo = scoreHand(test, state.melds[p], info, false, state.wall.length, state);
     if (scoreInfo.fan < state._minFan) {
       claim.responses[p] = { type: 'pass' };
@@ -354,7 +363,7 @@ function resolveClaims(state) {
   if (best.type === 'win') {
     const test = state.hands[p].slice();
     test.push(tile);
-    const info = core.huCheck(test, state.melds[p], CANTONESE);
+    const info = core.huCheck(test, state.melds[p], getCfg(state));
     var scoreInfo = scoreHand(test, state.melds[p], info, false, state.wall.length, state);
     // 起胡番数已在上方 demote 检查中保证 >= _minFan（不满足的 win 已被降级为 pass）
     state.winner = p;

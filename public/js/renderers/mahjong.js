@@ -359,6 +359,14 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
       ctx.font = Math.floor(h * 0.26) + 'px "Ma Shan Zheng","KaiTi","Microsoft YaHei",serif';
       ctx.fillText(SUIT_GLYPH[tile.k] || '', x + w / 2, y + h * 0.72);
     }
+    // 百搭标记：启用红中百搭规则时，红中牌左上角显示小标记
+    if (_state && _state._wildcard && tile.k === 'jian' && tile.n === 1 && w >= 20) {
+      ctx.fillStyle = 'rgba(255,200,40,.85)';
+      ctx.font = 'bold ' + Math.floor(h * 0.18) + 'px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText('W', x + 2, y + 1);
+    }
     ctx.restore();
   }
 

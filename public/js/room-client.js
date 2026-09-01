@@ -878,6 +878,7 @@
             '</div>' : mjMode === 'cantonese' ? '<div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">' +
               '<div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text-muted);">' + _t('mj_rules_cantonese') + '</div>' +
               mjToggle('mj_buyTiles', 'mj_rule_buyTiles') +
+              mjToggle('mj_wildcard', 'mj_rule_wildcard') +
               '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:6px;">' +
                 _t('mj_rule_maxFan') + ': ' +
                 '<select onchange="window._setGameOption(\'mj_maxFan\', parseInt(this.value))" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:13px;">' +

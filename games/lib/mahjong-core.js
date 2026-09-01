@@ -71,14 +71,27 @@ function buildDeck(cfg) {
 // ---- huCheck: determine if hand + melds is a winning hand ----
 
 function huCheck(hand, melds, cfg) {
-  // Count tiles by (k, n)
+  // Count tiles by (k, n), separating wildcards (百搭) if configured
+  const wildcardDef = cfg && cfg.wildcard;
+  let wildcards = 0;
   const counts = {};
   for (const t of hand) {
-    const key = t.k + ':' + t.n;
-    counts[key] = (counts[key] || 0) + 1;
+    if (wildcardDef && t.k === wildcardDef.k && t.n === wildcardDef.n) {
+      wildcards++;
+    } else {
+      const key = t.k + ':' + t.n;
+      counts[key] = (counts[key] || 0) + 1;
+    }
   }
 
   const exposedMelds = melds ? melds.length : 0;
+
+  // 特殊番型检测（十三幺/大三元/大四喜）—— 仅在不启用百搭时判断
+  // （百搭牌的归属不确定，特殊番型按原始牌面判定）
+  if (wildcards === 0) {
+    const special = checkSpecialHand(counts);
+    if (special) return special;
+  }
 
   // Try standard decomposition: find a pair, rest must form melds
   const keys = Object.keys(counts);
@@ -87,19 +100,140 @@ function huCheck(hand, melds, cfg) {
       const testCounts = Object.assign({}, counts);
       testCounts[key] -= 2;
       if (testCounts[key] === 0) delete testCounts[key];
-      if (canFormMelds(testCounts)) {
-        return { win: true, type: 'standard', pair: key };
+      if (canFormMeldsWild(testCounts, wildcards)) {
+        return { win: true, type: 'standard', pair: key, wildcard: wildcards > 0 };
       }
+    }
+  }
+
+  // Pair using wildcards: 1 real tile + 1 wildcard, or 2 wildcards
+  if (wildcards >= 1) {
+    for (const key of keys) {
+      if (counts[key] >= 1) {
+        const testCounts = Object.assign({}, counts);
+        testCounts[key] -= 1;
+        if (testCounts[key] === 0) delete testCounts[key];
+        if (canFormMeldsWild(testCounts, wildcards - 1)) {
+          return { win: true, type: 'standard', pair: key, wildcard: true };
+        }
+      }
+    }
+  }
+  if (wildcards >= 2) {
+    if (canFormMeldsWild(counts, wildcards - 2)) {
+      return { win: true, type: 'standard', pair: 'wildcard', wildcard: true };
     }
   }
 
   // Try seven pairs (only if no exposed melds)
   if (exposedMelds === 0) {
-    const qidui = trySevenPairs(counts);
-    if (qidui) return { win: true, type: 'qidui' };
+    const qidui = trySevenPairsWithWildcards(counts, wildcards);
+    if (qidui) return { win: true, type: 'qidui', wildcard: wildcards > 0 };
   }
 
   return { win: false };
+}
+
+// 特殊番型：十三幺、大三元、大四喜（从暗手牌面判定）
+function checkSpecialHand(counts) {
+  const terminals = ['wan:1','wan:9','tong:1','tong:9','tiao:1','tiao:9',
+                     'feng:1','feng:2','feng:3','feng:4','jian:1','jian:2','jian:3'];
+
+  // 十三幺: 13种幺九字牌各至少1张 + 恰好1张成对，其余各1张，总14张
+  let total = 0, pairCount = 0, zeroCount = 0;
+  for (const key of terminals) {
+    const c = counts[key] || 0;
+    total += c;
+    if (c === 0) zeroCount++;
+    else if (c >= 2) pairCount++;
+  }
+  if (total === 14 && zeroCount === 0 && pairCount === 1) {
+    return { win: true, type: 'shisanyao' };
+  }
+
+  // 大三元: 中(1)发(2)白(3) 各有至少3张（刻子）
+  const zhong = counts['jian:1'] || 0;
+  const fa = counts['jian:2'] || 0;
+  const bai = counts['jian:3'] || 0;
+  if (zhong >= 3 && fa >= 3 && bai >= 3) {
+    return { win: true, type: 'dasanyuan' };
+  }
+
+  // 大四喜: 东南西北 各有至少3张（刻子）
+  const dong = counts['feng:1'] || 0;
+  const nan = counts['feng:2'] || 0;
+  const xi = counts['feng:3'] || 0;
+  const bei = counts['feng:4'] || 0;
+  if (dong >= 3 && nan >= 3 && xi >= 3 && bei >= 3) {
+    return { win: true, type: 'dasixi' };
+  }
+
+  return null;
+}
+
+// 百搭面子递归：counts 为普通牌计数，wildcards 为剩余百搭数
+function canFormMeldsWild(counts, wildcards) {
+  const keys = Object.keys(counts).filter(k => counts[k] > 0);
+  if (keys.length === 0) return true;
+
+  const key = keys[0];
+  const [k, nStr] = key.split(':');
+  const n = parseInt(nStr);
+  const cnt = counts[key];
+
+  // 刻子：用 min(cnt,3) 张普通牌 + 百搭补足
+  if (cnt >= 3) {
+    const next = Object.assign({}, counts);
+    next[key] -= 3;
+    if (next[key] === 0) delete next[key];
+    if (canFormMeldsWild(next, wildcards)) return true;
+  }
+  const wildForPung = Math.max(0, 3 - cnt);
+  if (wildForPung > 0 && wildForPung <= wildcards) {
+    const next = Object.assign({}, counts);
+    delete next[key];
+    if (canFormMeldsWild(next, wildcards - wildForPung)) return true;
+  }
+
+  // 顺子（仅数牌）
+  if (k !== 'feng' && k !== 'jian' && n <= 7) {
+    const key2 = k + ':' + (n + 1);
+    const key3 = k + ':' + (n + 2);
+    const has2 = counts[key2] || 0;
+    const has3 = counts[key3] || 0;
+
+    // 纯顺子
+    if (has2 > 0 && has3 > 0) {
+      const next = Object.assign({}, counts);
+      next[key]--; if (next[key] === 0) delete next[key];
+      next[key2]--; if (next[key2] === 0) delete next[key2];
+      next[key3]--; if (next[key3] === 0) delete next[key3];
+      if (canFormMeldsWild(next, wildcards)) return true;
+    }
+    // 百搭顺子：缺几张补几张
+    const need = (has2 > 0 ? 0 : 1) + (has3 > 0 ? 0 : 1);
+    if (need > 0 && need <= wildcards) {
+      const next = Object.assign({}, counts);
+      next[key]--; if (next[key] === 0) delete next[key];
+      if (has2 > 0) { next[key2]--; if (next[key2] === 0) delete next[key2]; }
+      if (has3 > 0) { next[key3]--; if (next[key3] === 0) delete next[key3]; }
+      if (canFormMeldsWild(next, wildcards - need)) return true;
+    }
+  }
+
+  return false;
+}
+
+// 七对（含百搭辅助）
+function trySevenPairsWithWildcards(counts, wildcards) {
+  let pairs = 0, singles = 0;
+  for (const key in counts) {
+    const c = counts[key];
+    pairs += Math.floor(c / 2);
+    if (c % 2 !== 0) singles++;
+  }
+  // 单张用百搭配对
+  return singles <= wildcards;
 }
 
 function canFormMelds(counts) {
@@ -201,6 +335,12 @@ function countFanDetailed(hand, melds, winInfo, cfg, options) {
   if (options.selfDraw && options.wallCount === 0) details.push({ name: '海底捞', fan: 1 });
   // 杠上花
   if (options.gangShangHua) details.push({ name: '杠上花', fan: 1 });
+  // 特殊番型
+  if (winInfo && winInfo.type === 'dasanyuan') details.push({ name: '大三元', fan: 8 });
+  if (winInfo && winInfo.type === 'dasixi') details.push({ name: '大四喜', fan: 8 });
+  if (winInfo && winInfo.type === 'shisanyao') details.push({ name: '十三幺', fan: 8 });
+  // 百搭（红中当百搭胡牌时加 1 番）
+  if (winInfo && winInfo.wildcard) details.push({ name: '百搭', fan: 1 });
 
   var total = details.reduce(function (s, d) { return s + d.fan; }, 0);
   // 平胡底分：没有任何番种时记 1 分（四川麻将平胡起码 1 番）

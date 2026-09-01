@@ -8,6 +8,14 @@ const CANTONESE = core.CANTONESE;
 
 exports.name = 'mahjong-cantonese';
 
+// 构建含百搭的配置（与 games/mahjong-cantonese.js 的 getCfg 保持一致）
+function getCfg(state) {
+  if (state && state._wildcard) {
+    return { ...CANTONESE, wildcard: { k: 'jian', n: 1 } };
+  }
+  return CANTONESE;
+}
+
 // Count tiles in hand matching (k, n).
 function matchCount(hand, k, n) {
   let c = 0;
@@ -62,6 +70,7 @@ exports.createBot = function (playerIndex) {
 
     getMove: function (state) {
       const hand = state.hands[playerIndex];
+      const cfg = getCfg(state);
 
       // ---- claim phase: only act if this bot is the current responder ----
       if (state.phase === 'claim' && state.claim) {
@@ -74,7 +83,7 @@ exports.createBot = function (playerIndex) {
         // win if possible
         const test = hand.slice();
         test.push(tile);
-        if (core.huCheck(test, state.melds[playerIndex], CANTONESE).win) {
+        if (core.huCheck(test, state.melds[playerIndex], cfg).win) {
           return { type: 'win' };
         }
         const m = matchCount(hand, tile.k, tile.n);
@@ -97,17 +106,17 @@ exports.createBot = function (playerIndex) {
       // ---- play phase ----
       if (state.phase === 'play' && state.currentPlayer === playerIndex) {
         // self-draw win?
-        if (core.huCheck(hand, state.melds[playerIndex], CANTONESE).win) {
+        if (core.huCheck(hand, state.melds[playerIndex], cfg).win) {
           return { type: 'win' };
         }
         // 暗杠：4 张相同牌（数字牌），且不是听牌倾向时杠出（避免破坏听牌结构）
         const quadT = findQuad(hand);
-        if (quadT && quadT.k !== 'feng' && quadT.k !== 'jian' && !isTing(hand, state.melds[playerIndex])) {
+        if (quadT && quadT.k !== 'feng' && quadT.k !== 'jian' && !isTing(hand, state.melds[playerIndex], cfg)) {
           return { type: 'selfkong', suit: quadT.k, num: quadT.n };
         }
         // 补杠：有碰的刻子 + 摸到第 4 张
         const addK = findAddKongTile(hand, state.melds[playerIndex]);
-        if (addK && addK.k !== 'feng' && addK.k !== 'jian' && !isTing(hand, state.melds[playerIndex])) {
+        if (addK && addK.k !== 'feng' && addK.k !== 'jian' && !isTing(hand, state.melds[playerIndex], cfg)) {
           return { type: 'addkong', suit: addK.k, num: addK.n };
         }
         // discard the least-connected tile
@@ -153,11 +162,11 @@ function findAddKongTile(hand, melds) {
 }
 
 // 是否已听牌（距胡牌差 1 张）——听牌时优先保留暗杠结构，不杠
-function isTing(hand, melds) {
+function isTing(hand, melds, cfg) {
   for (const k of ['wan', 'tong', 'tiao']) {
     for (let n = 1; n <= 9; n++) {
       const test = hand.concat([{ k, n, id: 'test' }]);
-      if (core.huCheck(test, melds, CANTONESE).win) return true;
+      if (core.huCheck(test, melds, cfg).win) return true;
     }
   }
   return false;

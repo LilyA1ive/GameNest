@@ -218,6 +218,8 @@
     'mj_rules_cantonese': 'Cantonese Mahjong Rules',
     'mj_rule_buyTiles': 'Buy Tiles (买码)',
     'mj_rule_buyTiles_desc': 'After winning, buy tiles from the wall end; each honor tile adds extra fan.',
+    'mj_rule_wildcard': 'Red Dragon Wild (红中百搭)',
+    'mj_rule_wildcard_desc': 'Red Dragon (中) acts as a wild card, substituting for any tile.',
     'mj_rule_maxFan': 'Max Fan Cap (封顶)',
     'mj_rule_minFan': 'Min Fan to Win (起胡)',
     'random_boards': 'Random each',

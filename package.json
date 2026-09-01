@@ -11,7 +11,7 @@
     "start": "node server.js",
     "test": "node scripts/run-tests.js",
     "check": "node scripts/check-syntax.js",
-    "build:desktop": "npx @yao-pkg/pkg . --out-path dist --targets node24-win-x64",
+    "build:desktop": "npx @yao-pkg/pkg . --out-path dist --targets node24-win-x64 --compress Brotli",
     "test:monopoly": "node tests/monopoly.test.js"
   },
   "pkg": {

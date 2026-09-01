@@ -70,6 +70,18 @@ logStep('[android-node] server.js require: qrcode');
 const QRCode = require('qrcode');
 logStep('[android-node] server.js require complete');
 
+// 注册表为空 = 所有游戏都会报"无效的游戏类型"，但服务器照常启动。
+// 这种静默失败极难排查（pkg 打包时 games/ 若不可 require 就会这样），必须显式报出来。
+if (!process.env.ANDROID_SKIP_REGISTRY_LOAD) {
+  const gameCount = Object.keys(gameRegistry).length;
+  if (gameCount === 0) {
+    console.error('[GameNest] FATAL: game registry is empty — no modules loaded from ' + gamesDir);
+    console.error('[GameNest] Every create_room will fail. If this is a packaged build, the games/ directory is not requirable.');
+  } else if (process.env.GAMENEST_DEBUG === '1') {
+    console.log('[GameNest] loaded ' + gameCount + ' games, ' + Object.keys(botRegistry).length + ' bots');
+  }
+}
+
 logStep('[android-node] server.js init express app');
 const app = express();
 // gzip text-based assets (HTML/CSS/JSON/JS). PNG/JPG/WebP are already compressed

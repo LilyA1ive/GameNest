@@ -67,7 +67,8 @@ test('liarsbar bot suspects when evidence strongly suggests the last claim is fa
 
 test('liarsbar bot prefers exact theme cards before spending wild cards', () => {
   const move = withMockedRandom(0.99, () => makeBot().getMove(makeState()));
-  assert.deepEqual(move, { action: 'play', cardId: 'qh' });
+  // 出牌改为多选后，bot 返回 cardIds 数组（games/liarsbar.js 只接受数组）
+  assert.deepEqual(move, { action: 'play', cardIds: ['qh'] });
 });
 
 test('liarsbar bot saves ghost cards until they are the last practical option', () => {

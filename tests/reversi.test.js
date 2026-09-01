@@ -103,15 +103,34 @@ test('pass when no legal moves', () => {
 
 test('both players pass ends the game', () => {
   const state = createState();
-  // Simulate two passes
+  // 官方规则：有合法落点时不许虚着，所以必须先造一个双方都无棋可下的局面。
+  // 棋盘几乎填满同色，仅留两个空格且都无法夹子，双方都只能 pass。
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      state.board[r][c] = 1; // 全白
+    }
+  }
+  state.board[0][0] = null;
+  state.board[7][7] = null;
+  state.currentPlayer = 0;
+  state.winner = null;
+  state.passCount = 0;
+
   const err1 = reversi.handleMove({ pass: true }, state, 0);
-  assert.equal(err1, null);
+  assert.equal(err1, null, 'black has no legal move, pass should be accepted');
   assert.equal(state.currentPlayer, 1);
   assert.equal(state.passCount, 1);
 
   const err2 = reversi.handleMove({ pass: true }, state, 1);
-  assert.equal(err2, null);
+  assert.equal(err2, null, 'white has no legal move either');
   assert.notEqual(state.winner, null, 'game should end after 2 passes');
+});
+
+test('pass is rejected while a legal move exists', () => {
+  const state = createState();
+  // 开局黑棋有 4 个合法落点，规则要求有棋必下
+  assert.equal(reversi.playerView(state, 0).legalMoves.length, 4);
+  assert.ok(reversi.handleMove({ pass: true }, state, 0), 'should reject pass');
 });
 
 test('game ends when board is full', () => {

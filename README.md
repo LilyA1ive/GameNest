@@ -1,6 +1,6 @@
 # GameNest
 
-> 27 self-hosted LAN board, card, party, puzzle, and real-time games. Start one server, share one room code or QR code, and play from any browser on the same WiFi.
+> 32 self-hosted LAN board, card, party, puzzle, and real-time games. Start one server, share one room code or QR code, and play from any browser on the same WiFi.
 
 **[🚀 Live Demo](https://gamenest-4kww.onrender.com) — try it without installing.**
 
@@ -9,7 +9,7 @@
 [![Android APK](https://github.com/absswds/GameNest/actions/workflows/android-apk.yml/badge.svg)](https://github.com/absswds/GameNest/actions/workflows/android-apk.yml)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-43853d.svg)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-4.x-lightgrey.svg)](https://expressjs.com/)
-[![Games](https://img.shields.io/badge/Games-27-blue.svg)](#game-catalog)
+[![Games](https://img.shields.io/badge/Games-32-blue.svg)](#game-catalog)
 [![No account](https://img.shields.io/badge/Account-Not_Required-green.svg)](#highlights)
 [![Offline](https://img.shields.io/badge/Network-LAN/Offline-orange.svg)](#highlights)
 [![Android](https://img.shields.io/badge/Host-Android_✓-brightgreen.svg)](#android-host)
@@ -20,7 +20,7 @@ GameNest is a lightweight open-source tabletop game room for family nights, dorm
 
 ## Highlights
 
-- 27 built-in games covering classic boards, party cards, poker, deduction, puzzle races, and real-time battles.
+- 32 built-in games covering classic boards, party cards, poker, deduction, puzzle races, and real-time battles.
 - Local-first multiplayer: no account system, no cloud dependency, just one host and one shared WiFi.
 - Room code and QR-code joining for phones, tablets, and laptops.
 - Waiting-room flow with player names, emoji avatars, ready state, seat swaps, bots, and per-game options.
@@ -86,13 +86,11 @@ taskkill /f /im node.exe
 
 | Category | Games |
 | --- | --- |
-| Classic board | Tic-Tac-Toe, Gomoku, Flight Chess, Chinese Chess, Chess, Checkers, Connect Four, Reversi, Go 9x9 |
-| Party cards | UNO, Exploding Kittens, Number Bomb, Old Maid, Draw & Guess, Truth or Dare |
-| Deduction | Davinci Code, Liar's Bar |
-| Poker | Dou Dizhu, Big Two, Texas Hold'em |
-| Tabletop strategy | Rummikub, Monopoly |
-| Brain racing | 24 Game, Minesweeper Race, Sheep Tile |
-| Real-time battle | Snake Battle, Suika Battle |
+| Board Games | Tic-Tac-Toe, Gomoku, Chinese Chess, Chess, Checkers, Connect Four, Reversi, Go 9x9, Battleship |
+| Cards & Tiles | Texas Hold'em, Dou Dizhu, Davinci Code, Rummikub, Liar's Bar, Big Two, Mahjong, Hearts |
+| Party | Monopoly, Flight Chess, Draw & Guess, UNO, Number Bomb, Old Maid, Exploding Kittens, Truth or Dare |
+| Puzzle | Sheep Tile, 24 Game, Sudoku, 2048, Minesweeper Race |
+| Real-time | Suika Battle, Snake Battle |
 
 ## Commands
 

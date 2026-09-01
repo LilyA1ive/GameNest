@@ -8,7 +8,7 @@
       description: 'A quick warm-up duel for two players.',
       players: '2 Players',
       duration: '~1 min',
-      category: 'Classic Board',
+      category: 'Board Games',
       tags: ['Fast', 'Beginner Friendly'],
     },
     gomoku: {
@@ -17,7 +17,7 @@
       description: 'A deeper classic stone-placing duel.',
       players: '2 Players',
       duration: '~5 min',
-      category: 'Classic Board',
+      category: 'Board Games',
       tags: ['Strategy', 'Duel'],
     },
     davinci: {
@@ -26,7 +26,7 @@
       description: 'Infer opponents\' hidden tiles by number and color.',
       players: '2-6 Players',
       duration: '~15 min',
-      category: 'Deduction Cards',
+      category: 'Cards & Tiles',
       tags: ['Deduction', 'Mind Games'],
     },
     uno: {
@@ -35,7 +35,7 @@
       description: 'Easy to learn, perfect for a lively party table.',
       players: '2-6 Players',
       duration: '~10 min',
-      category: 'Party Cards',
+      category: 'Party',
       tags: ['Classic', 'Party'],
     },
     doudizhu: {
@@ -44,7 +44,7 @@
       description: 'Classic 3-player climbing game. AI fills in anytime.',
       players: '2-3 Players',
       duration: '~10 min',
-      category: 'Card Climbing',
+      category: 'Cards & Tiles',
       tags: ['Classic', '3-Player'],
     },
     'exploding-kittens': {
@@ -53,7 +53,7 @@
       description: 'A light party game of luck and item cards.',
       players: '2-6 Players',
       duration: '~15 min',
-      category: 'Party Cards',
+      category: 'Party',
       tags: ['Fun', 'Reversals'],
     },
     rummikub: {
@@ -62,7 +62,7 @@
       description: 'Arrange tiles into sets and runs. Addictive table play.',
       players: '2-4 Players',
       duration: '~15 min',
-      category: 'Table Strategy',
+      category: 'Cards & Tiles',
       tags: ['Combos', 'Replayable'],
     },
     sudoku: {
@@ -71,7 +71,7 @@
       description: 'Race to fill all blanks on the same puzzle.',
       players: '2-4 Players',
       duration: '~5 min',
-      category: 'Brain Race',
+      category: 'Puzzle',
       tags: ['Logic', 'Multiplayer'],
     },
     '2048': {
@@ -80,7 +80,7 @@
       description: 'Same starting board — race to reach 2048.',
       players: '2-4 Players',
       duration: '~5 min',
-      category: 'Brain Race',
+      category: 'Puzzle',
       tags: ['Numbers', 'Multiplayer'],
     },
     twentyfour: {
@@ -89,7 +89,7 @@
       description: 'Quick-fire arithmetic racing — perfect for a group.',
       players: '2-6 Players',
       duration: '~5 min',
-      category: 'Brain Race',
+      category: 'Puzzle',
       tags: ['Math', 'Multiplayer'],
     },
     minesweeper: {
@@ -98,7 +98,7 @@
       description: 'Race on an identical minefield. One mistake and you\'re out.',
       players: '2-6 Players',
       duration: '~5 min',
-      category: 'Brain Race',
+      category: 'Puzzle',
       tags: ['Speed', 'Observation'],
     },
     numberbomb: {
@@ -107,7 +107,7 @@
       description: 'The easiest game to get everyone hooked on guessing numbers.',
       players: '2-10 Players',
       duration: '~10 min',
-      category: 'Party Cards',
+      category: 'Party',
       tags: ['Social', 'Guessing'],
     },
     oldmaid: {
@@ -116,7 +116,7 @@
       description: 'A light card game perfect for relaxing with friends.',
       players: '2-6 Players',
       duration: '~15 min',
-      category: 'Party Cards',
+      category: 'Party',
       tags: ['Casual', 'Multiplayer'],
     },
     liarsbar: {
@@ -125,7 +125,7 @@
       description: 'Half bluff, half social — pure psychological warfare.',
       players: '2-6 Players',
       duration: '~15 min',
-      category: 'Deduction Cards',
+      category: 'Cards & Tiles',
       tags: ['Psychology', 'Bluff'],
     },
     bigtwo: {
@@ -134,7 +134,7 @@
       description: 'Sharp traditional climbing card game.',
       players: '2-4 Players',
       duration: '~10 min',
-      category: 'Card Climbing',
+      category: 'Cards & Tiles',
       tags: ['Climbing', 'Traditional'],
     },
     'mahjong-sichuan': {
@@ -143,7 +143,7 @@
       description: 'National treasure — Sichuan blood battle or Cantonese chicken-style.',
       players: '2-4 Players',
       duration: '~20 min',
-      category: 'Mahjong',
+      category: 'Cards & Tiles',
       tags: ['Mahjong', 'Strategy'],
     },
     texas: {
@@ -152,7 +152,7 @@
       description: 'The perfect poker night atmosphere.',
       players: '2-8 Players',
       duration: '~20 min',
-      category: 'Poker',
+      category: 'Cards & Tiles',
       tags: ['Chips', 'Bluff'],
     },
     flightchess: {
@@ -161,7 +161,7 @@
       description: 'Casual family-friendly race board game.',
       players: '2-4 Players',
       duration: '~10 min',
-      category: 'Classic Board',
+      category: 'Party',
       tags: ['Family', 'Casual'],
     },
     snakebattle: {
@@ -179,7 +179,7 @@
       description: 'A deep abstract strategy game for immersive matches.',
       players: '2 Players',
       duration: '~20 min',
-      category: 'Classic Board',
+      category: 'Board Games',
       tags: ['Deep', 'Traditional'],
     },
     chess: {
@@ -188,7 +188,7 @@
       description: 'Full FIDE-rules two-player chess.',
       players: '2',
       duration: '~15 min',
-      category: 'Classic Board',
+      category: 'Board Games',
       tags: ['Deep', 'Classic'],
     },
     checkers: {
@@ -197,7 +197,7 @@
       description: '8×8 draughts with multi-jump and king rules.',
       players: '2',
       duration: '~10 min',
-      category: 'Classic Board',
+      category: 'Board Games',
       tags: ['Classic', 'Easy'],
     },
     connect4: {
@@ -206,7 +206,7 @@
       description: '7×6 gravity chess, fun for all ages.',
       players: '2',
       duration: '~5 min',
-      category: 'Classic Board',
+      category: 'Board Games',
       tags: ['Family', 'Fast'],
     },
     reversi: {
@@ -215,7 +215,7 @@
       description: '8×8 Othello with corner heuristic AI.',
       players: '2',
       duration: '~10 min',
-      category: 'Classic Board',
+      category: 'Board Games',
       tags: ['Strategy', 'Reversal'],
     },
     go9: {
@@ -224,7 +224,7 @@
       description: 'A faster Go on a 9×9 board. Great for online play.',
       players: '2 Players',
       duration: '~15 min',
-      category: 'Classic Board',
+      category: 'Board Games',
       tags: ['Territory', 'Short'],
     },
     monopoly: {
@@ -233,7 +233,7 @@
       description: 'Buy properties, build houses, and drive your rivals into bankruptcy.',
       players: '2-6 Players',
       duration: '~20 min',
-      category: 'Table Strategy',
+      category: 'Party',
       tags: ['Economy', 'Event Cards'],
     },
     suikabattle: {
@@ -251,7 +251,7 @@
       description: 'Layered tile-matching. Clear the board before your opponent does.',
       players: '2-6 Players',
       duration: '~10 min',
-      category: 'Brain Race',
+      category: 'Puzzle',
       tags: ['Match', 'Stacking'],
     },
     drawguess: {
@@ -260,7 +260,7 @@
       description: 'A telephone-style drawing game. The worse the drawing, the better the laugh.',
       players: '2-8 Players',
       duration: '~15 min',
-      category: 'Party Cards',
+      category: 'Party',
       tags: ['Social', 'Funny'],
     },
     battleship: {
@@ -269,7 +269,7 @@
       description: 'Classic two-player naval strategy on a 10×10 grid. Hide your ships and hunt theirs.',
       players: '2 Players',
       duration: '~15 min',
-      category: 'Classic Board',
+      category: 'Board Games',
       tags: ['Strategy', 'Duel'],
     },
     hearts: {
@@ -278,17 +278,8 @@
       description: 'Classic 4-player trick-taking. Hearts = 1pt, Queen of Spades = 13pts.',
       players: '4 Players',
       duration: '~20 min',
-      category: 'Card Climbing',
+      category: 'Cards & Tiles',
       tags: ['Trick-taking', 'Strategy'],
-    },
-    sanguosha: {
-      name: 'Sanguosha',
-      subtitle: 'Identity mode — lord vs rebels',
-      description: 'Classic identity mode: lord, loyalists, rebels, traitor. Kill or be killed.',
-      players: '4-8 Players',
-      duration: '~20 min',
-      category: 'Chinese Strategy',
-      tags: ['Identity', 'Strategy', 'Multiplayer'],
     },
     truthdare: {
       name: 'Truth or Dare',

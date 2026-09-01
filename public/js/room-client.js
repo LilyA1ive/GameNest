@@ -399,6 +399,20 @@
   }
 
   // ---- UI Toggle ----
+  // 麻将竖屏放不下 14 张手牌（360dp 宽最多容 ~8 张可点的牌），锁横屏 + 沉浸式全屏。
+  // 安卓走 WebAppBridge；普通浏览器退化到 Screen Orientation API（多数需已全屏，失败静默）。
+  const IMMERSIVE_GAMES = ['mahjong-sichuan', 'mahjong-cantonese'];
+  function setImmersiveLandscape(on) {
+    try {
+      if (window.GameNestNative && window.GameNestNative.setImmersiveLandscape) {
+        window.GameNestNative.setImmersiveLandscape(!!on);
+      } else if (window.screen && screen.orientation) {
+        if (on && screen.orientation.lock) screen.orientation.lock('landscape').catch(function() {});
+        else if (!on && screen.orientation.unlock) screen.orientation.unlock();
+      }
+    } catch (e) { /* 桌面浏览器不支持，静默降级 */ }
+  }
+
   function showGame() {
     el.waitingRoom.style.display = 'none';
     el.profileEdit.style.display = 'none';
@@ -406,10 +420,13 @@
     el.gameStage.style.display = '';
     el.playerBar.style.display = '';
     el.status.style.display = '';
+    // 动作条现在在文档流最底部、不遮挡棋盘，所有游戏都照常显示
     el.gameActions.style.display = '';
+    setImmersiveLandscape(IMMERSIVE_GAMES.indexOf(game) !== -1);
   }
 
   function showLobby() {
+    setImmersiveLandscape(false);
     el.waitingRoom.style.display = '';
     el.profileEdit.style.display = 'flex';
     el.emojiRow.style.display = '';
@@ -424,6 +441,13 @@
 
   // ---- Waiting Room ----
   function updateWaitingRoom() {
+    // 房主身份与 phase 无关，必须在 playing 早退之前算：
+    // 中途退出房间会让页面重载、isHost 归 false，再重连进 playing 房间时
+    // 若在早退之后才算，就永远读不到服务端下发的 isHost。
+    const myInfo = players ? players.find(p => p.index === playerIndex && !p.isBot) : null;
+    isHost = myInfo ? myInfo.isHost : false;
+    myReady = myInfo ? myInfo.ready : false;
+
     if (roomPhase === 'playing') {
       updateSharedShell();
       showGame();
@@ -434,11 +458,6 @@
 
     // Update shared shell copy
     updateSharedShell();
-
-    // Check host status
-    const myInfo = players ? players.find(p => p.index === playerIndex && !p.isBot) : null;
-    isHost = myInfo ? myInfo.isHost : false;
-    myReady = myInfo ? myInfo.ready : false;
 
     // Profile: name + avatar
     var avatarEmoji = el.avatarEmoji;
@@ -1075,6 +1094,7 @@
   }
 
   function showResult(winner) {
+    if (game === 'mahjong-sichuan' || game === 'mahjong-cantonese') return;
     const overlay = el.overlay;
     const resultEl = el.resultText;
     let txt, sub, isWin = false;
@@ -1171,6 +1191,8 @@
 
   window.doLeaveRoom = function() {
     if (typeof window._beforeLeaveRoom === 'function') window._beforeLeaveRoom();
+    // 页面马上要 location.replace 跳走，showLobby() 不会执行，必须在这里主动解锁横屏
+    setImmersiveLandscape(false);
     send('leave_room');
     // Keep roomId + resumeToken in sessionStorage so lobby shows the resume banner
     sessionStorage.setItem('_returnFromGame', '1');

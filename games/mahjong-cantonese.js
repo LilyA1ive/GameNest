@@ -74,6 +74,7 @@ exports.createState = function () {
     currentPlayer: 0,
     dealer: 0,
     hasDrawn: false,    // currentPlayer has drawn this turn
+    drawn: null,        // id of the newly drawn tile (for highlight)
     lastDiscard: null,  // { tile, player }
     winner: null,       // player index, or -1 = 荒庄
     winInfo: null,      // { type, from, fan }
@@ -115,6 +116,8 @@ exports.initGame = function (state, playerCount) {
   state.winInfo = null;
   state.lastDiscard = null;
   state.claim = null;
+  state.drawn = null;
+  state.hasDrawn = false;
   // dealer draws first tile
   beginTurn(state, 0);
 };
@@ -125,6 +128,7 @@ function beginTurn(state, player) {
     state.phase = 'over';
     state.winner = -1; // 荒庄 — draw game, no winner
     state.hasDrawn = false;
+    state.drawn = null;
     return;
   }
   const tile = state.wall.pop();
@@ -132,6 +136,7 @@ function beginTurn(state, player) {
   sortHand(state.hands[player]);
   state.currentPlayer = player;
   state.hasDrawn = true;
+  state.drawn = tile.id;
   state.phase = 'play';
 }
 
@@ -180,6 +185,7 @@ exports.handleMove = function (data, state, playerIndex) {
       state.discards[playerIndex].push(tile);
       state.lastDiscard = { tile, player: playerIndex };
       state.hasDrawn = false;
+      state.drawn = null;
 
       // build claim list: eligible players in turn order starting after discarder
       const order = [];
@@ -335,12 +341,16 @@ function resolveClaims(state) {
     if (state.wall.length === 0) {
       // no replacement available — still must discard; hand is short by one
       state.hasDrawn = true;
+      state.drawn = null;
       state.phase = 'play';
       return;
     }
     const rep = state.wall.pop();
     state.hands[p].push(rep);
     sortHand(state.hands[p]);
+    state.drawn = rep.id;
+  } else {
+    state.drawn = null;
   }
   state.hasDrawn = true;
   state.phase = 'play';
@@ -408,6 +418,8 @@ exports.playerView = function (state, playerIndex) {
     buyTiles: state.winInfo && state.winInfo.buyTiles ? state.winInfo.buyTiles.map(t => ({ k: t.k, n: t.n, id: t.id })) : null,
     buyFan: state.winInfo ? state.winInfo.buyFan || 0 : 0,
     hasDrawn: state.hasDrawn,
+    // 刚摸的牌进的是暗手，只能让摸牌者本人看见，否则对手能逐回合还原他的手牌
+    drawn: state.currentPlayer === playerIndex ? (state.drawn || null) : null,
     // own hand: full tiles; others: count only
     hands: state.hands.map((h, i) => {
       if (i === playerIndex) return h.map(t => ({ k: t.k, n: t.n, id: t.id }));
@@ -425,6 +437,9 @@ exports.playerView = function (state, playerIndex) {
       order: state.claim.order.slice(),
       idx: state.claim.idx,
     } : null,
+    cumulativeScore: state.cumulativeScore ? state.cumulativeScore.slice() : [0,0,0,0],
+    roundNumber: state.roundNumber || 1,
+    dealerIndex: state.dealerIndex || 0,
     _playerCount: state._playerCount,
     _buyTiles: state._buyTiles,
     _maxFan: state._maxFan,

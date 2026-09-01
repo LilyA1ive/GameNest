@@ -12,12 +12,13 @@ android {
         applicationId "com.gamenest.app"
         minSdk 26
         targetSdk 36
-        versionCode 1
-        versionName "1.0"
+        versionCode 5
+        versionName "1.5.0"
 
         ndk {
-            // nodejs-mobile supports these ABIs - drop x86 if you only target real phones
-            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+            // 排除 x86_64（仅模拟器用）。每个 ABI 都含一份 47MB 的 libnode.so，
+            // 所以下面用 splits 按 ABI 拆包，而不是打成一个胖包。
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
         }
 
         externalNativeBuild {
@@ -32,6 +33,18 @@ android {
         cmake {
             path 'src/main/cpp/CMakeLists.txt'
             version '4.1.2'
+        }
+    }
+
+    // 按 ABI 拆包发 GitHub Release：libnode.so 单份 47MB，打成一个胖包会让
+    // 每个用户都白下一份用不上的架构。universalApk 额外产出一个全 ABI 包，
+    // 给不确定自己机型的人兜底。
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a'
+            universalApk true
         }
     }
 
@@ -77,6 +90,24 @@ android {
         main {
             // nodejs-mobile prebuilt libs live here
             jniLibs.srcDirs = ['libs/jniLibs']
+        }
+    }
+}
+
+// 每个 ABI 分包给一个独立 versionCode，否则三个包同号，
+// 先装 universal 再装某个 split（或反过来）会被当成同版本重装。
+// universal 不加偏移，保持 defaultConfig 的 versionCode，始终最低。
+androidComponents {
+    def abiOffset = ['armeabi-v7a': 1, 'arm64-v8a': 2]
+    onVariants(selector().all()) { variant ->
+        variant.outputs.each { output ->
+            def abiFilter = output.filters.find {
+                it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI
+            }
+            def offset = abiFilter ? (abiOffset[abiFilter.identifier] ?: 0) : 0
+            if (offset) {
+                output.versionCode.set(output.versionCode.get() * 10 + offset)
+            }
         }
     }
 }

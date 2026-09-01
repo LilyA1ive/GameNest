@@ -325,16 +325,6 @@
         { h: '策略提示', p: '放置时分散战舰位置，避免集中。射击时利用命中后的相邻格追射，直到击沉。' },
       ]
     },
-    sanguosha: {
-      sections: [
-        { h: '游戏目标', p: '身份局，主公与反贼两大阵营对决。反贼除掉主公即胜，忠臣护主、内奸控场，主公清剿反贼。' },
-        { h: '身份分配', p: '看主公身份牌亮出后，其余玩家各拿一张暗置身份牌。通常按玩家人数配：主公1、忠臣、反贼、内奸。' },
-        { h: '基础牌', p: '「杀」用于攻击，「闪」用于躲避「杀」，「桃」回复体力。装备牌提供武器/防具加成。锦囊牌一次性生效。' },
-        { h: '回合流程', p: '回合内依次：摸牌 → 出牌 → 弃牌，然后交给下家。出牌阶段可出任意数量的杀（装备诸葛连弩可无限出杀，否则每回合限1张）。' },
-        { h: '胜负判定', p: '反贼除掉主公即胜——但如果死亡后战场上只剩内奸一人，则内奸单独获胜。反贼全灭且内奸也阵亡，则主公与忠臣获胜。内奸必须存活到最后、成为唯一幸存者才能获胜。' },
-        { h: '小贴士', p: '注意隐藏身份，谨慎出杀；内奸要平衡各方，最后再单挑主公。' },
-      ]
-    },
   };
 
   var TUTORIALS_EN = {
@@ -664,16 +654,6 @@
         { h: 'Firing', p: 'Players take turns clicking a cell on the enemy grid to fire. Hits show a red X, misses show a gray dot. Sinking an entire ship highlights it in bold red.' },
         { h: 'Winning', p: 'Sink all 5 enemy ships to win. After the game ends, all enemy ship positions are revealed.' },
         { h: 'Strategy', p: 'Spread your ships out to avoid easy patterns. When you score a hit, fire at adjacent cells to track down the rest of the ship.' },
-      ]
-    },
-    sanguosha: {
-      sections: [
-        { h: 'Objective', p: 'Identity mode — a duel between lord and rebel factions. Rebels win by slaying the lord; loyalists protect him, the traitor plays all sides, and the lord cleans up the rebels.' },
-        { h: 'Roles', p: 'The Lord reveals his identity; everyone else draws a hidden role. Roles scale with player count: 1 Lord, loyalists, rebels, one traitor.' },
-        { h: 'Basic Cards', p: '「Slash」attacks, 「Dodge」blocks Slash, 「Peach」heals. Equipment cards boost weapon/armor. Trick cards resolve once.' },
-        { h: 'Turn Flow', p: 'On your turn: draw → play → discard, then pass. During the play phase you may play 1 Slash per turn (unlimited with the Crossbow equipped).' },
-        { h: 'Winning', p: 'Rebels win by slaying the Lord — but if the only survivor at that moment is the traitor, the traitor wins instead. If all rebels and the traitor are eliminated, the Lord and loyalists win. The traitor must be the sole survivor to claim victory.' },
-        { h: 'Tip', p: 'Hide your role and slash carefully. The traitor balances the factions, then hunts the Lord at the end.' },
       ]
     },
   };

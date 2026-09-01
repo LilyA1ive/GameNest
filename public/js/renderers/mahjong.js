@@ -18,8 +18,11 @@
   var _hoverIdx = -1;       // hovered own-hand tile index
   var _layout = [];         // hit-test rects for own hand
   var _state = null;
+var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，resize 只能挂一次
   var _lastDiscardPulse = 0; // 弃牌落点脉冲相位(0..1)
   var _lastDiscardId = null; // 上次弃牌 id（检测变化触发脉冲）
+  var _lastDrawnId = null;   // 上次新摸牌 id
+  var _drawPulse = 0;        // 新摸牌脉冲(0..1) 青蓝高亮
   var _animTimer = null;     // 动画循环句柄
   var _claimEffects = [];    // 碰杠吃胡动画效果 [{ pos, type, text, birth }]
   var _shownWinners = new Set(); // 已触发过胡牌动画的玩家（避免血战到底反复弹出）
@@ -74,7 +77,11 @@
         canvas = document.getElementById('mjCanvas');
         ctx = canvas.getContext('2d');
         sizeCanvas();
-        window.addEventListener('resize', sizeCanvas);
+        // 设置 canvas.width 会清空画布，必须紧接着重绘，否则旋转屏幕后白屏
+        if (!_resizeBound) {
+          window.addEventListener('resize', function() { sizeCanvas(); draw(); });
+          _resizeBound = true;
+        }
         canvas.addEventListener('click', onClick);
         canvas.addEventListener('mousemove', onMouseMove);
         canvas.addEventListener('mouseleave', function() { _hoverIdx = -1; draw(); });
@@ -99,6 +106,14 @@
           _lastDiscardPulse = 1;
           startAnimLoop();
         }
+        // 检测新摸牌 → 触发青蓝脉冲（与黄色轮到你区分）
+        var curDrawn = state && state.drawn;
+        if (curDrawn && curDrawn !== _lastDrawnId && state.currentPlayer === _playerIndex && state.phase === 'play') {
+          _lastDrawnId = curDrawn;
+          _drawPulse = 1;
+          startAnimLoop();
+        }
+        if (!curDrawn) { _lastDrawnId = null; _drawPulse = 0; }
         // 检测新增明牌 → 触发碰杠吃胡动画
         if (state && state.melds) {
           for (var i = 0; i < state.melds.length; i++) {
@@ -135,7 +150,7 @@
     },
   });
 
-  // ---- 动画循环：弃牌脉冲 + 碰杠效果，空闲自动停 ----
+  // ---- 动画循环：弃牌脉冲 + 碰杠效果 + 新摸牌脉冲，空闲自动停 ----
   function startAnimLoop() {
     if (_animTimer) return;
     var tick = function () {
@@ -144,6 +159,12 @@
       if (_lastDiscardPulse > 0.01) {
         _lastDiscardPulse *= 0.92;
         if (_lastDiscardPulse < 0.02) _lastDiscardPulse = 0;
+        active = true;
+      }
+      // 新摸牌青蓝脉冲
+      if (_drawPulse > 0.01) {
+        _drawPulse *= 0.88;
+        if (_drawPulse < 0.02) _drawPulse = 0;
         active = true;
       }
       // 碰杠效果（2 秒生命周期）
@@ -213,6 +234,9 @@
   }
 
   function drawTileFace(x, y, w, h, tile, highlight) {
+    // highlight: false/0 = none, 1/'hover' = 金色(悬停), 2/'drawn' = 青蓝(新摸, 与黄色轮提示区分)
+    var isHover = highlight === 1 || highlight === true || highlight === 'hover';
+    var isDrawn = highlight === 2 || highlight === 'drawn';
     ctx.save();
     // 投影：牌从台面浮起（自己手牌才画投影，牌河/明牌省略以保性能）
     if (w >= TW * 0.9) {
@@ -222,9 +246,12 @@
     }
     // 象牙白渐变（顶亮底暗，模拟顶光）
     var grad = ctx.createLinearGradient(x, y, x, y + h);
-    if (highlight) {
+    if (isHover) {
       grad.addColorStop(0, '#fffef6');
       grad.addColorStop(1, '#f4eac4');
+    } else if (isDrawn) {
+      grad.addColorStop(0, '#ecfeff');
+      grad.addColorStop(1, '#a5f3fc');
     } else {
       grad.addColorStop(0, '#fdfbf0');
       grad.addColorStop(0.45, '#f9f4e3');
@@ -234,9 +261,11 @@
     roundRect(x, y, w, h, 5);
     ctx.fill();
     ctx.shadowColor = 'transparent';
-    // 描边
-    ctx.strokeStyle = highlight ? '#c8a45c' : 'rgba(0,0,0,.16)';
-    ctx.lineWidth = highlight ? 2.5 : 1;
+    // 描边：悬停金色，新摸青蓝，普通灰
+    if (isHover) ctx.strokeStyle = '#c8a45c';
+    else if (isDrawn) ctx.strokeStyle = '#06b6d4';
+    else ctx.strokeStyle = 'rgba(0,0,0,.16)';
+    ctx.lineWidth = (isHover || isDrawn) ? 2.5 : 1;
     roundRect(x, y, w, h, 5);
     ctx.stroke();
     // 顶边高光（倒角反光）
@@ -382,7 +411,8 @@
     ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(t('mj_wall_left', '余牌: ') + count, W / 2, H / 2 + 85);
+    var rn = _state.roundNumber || 1;
+    ctx.fillText(t('mj_round_label', '第') + rn + t('mj_round_unit', '局') + ' · ' + t('mj_wall_left', '余牌: ') + count, W / 2, H / 2 + 85);
     ctx.restore();
   }
 
@@ -448,16 +478,64 @@
     _layout = [];
     for (var i = 0; i < n; i++) {
       var x = startX + i * (tw + 4);
-      var lift = _hoverIdx === i ? -12 : 0;
+      var isDrawn = _state.drawn && hand[i].id === _state.drawn && _state.currentPlayer === _playerIndex && _state.phase === 'play';
       var hover = _hoverIdx === i;
-      drawTileFace(x, y + lift, tw, th, hand[i], hover);
+      var lift = hover ? -12 : (isDrawn ? -10 : 0);
+      // 新摸牌青蓝外发光（与黄色回合提示区分）
+      if (isDrawn && _drawPulse > 0.01) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(6,182,212,' + (0.65 * _drawPulse) + ')';
+        ctx.shadowBlur = 16 + 10 * _drawPulse;
+        ctx.fillStyle = 'rgba(6,182,212,' + (0.10 * _drawPulse) + ')';
+        roundRect(x - 4, y + lift - 4, tw + 8, th + 8, 8);
+        ctx.fill();
+        ctx.restore();
+      }
+      var hl = hover ? 1 : (isDrawn ? 2 : 0);
+      drawTileFace(x, y + lift, tw, th, hand[i], hl);
+      // 新摸角标“新”
+      if (isDrawn) {
+        ctx.save();
+        ctx.fillStyle = '#06b6d4';
+        ctx.beginPath();
+        ctx.arc(x + tw - 9, y + lift + 9, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('新', x + tw - 9, y + lift + 9.5);
+        ctx.restore();
+      }
       _layout.push({ x: x, y: y + lift, w: tw, h: th, idx: i });
+    }
+    // 定缺花色（自己）：钉在手牌区左上角，缺什么就亮什么
+    var vs = _state.voidSuit && _state.voidSuit[_playerIndex];
+    if (vs) {
+      var vsLabel = vs === 'wan' ? '万' : vs === 'tong' ? '筒' : '条';
+      var vsColor = vs === 'wan' ? '#ff6b6b' : vs === 'tong' ? '#4dabf7' : '#51cf66';
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,.6)';
+      ctx.shadowBlur = 4;
+      ctx.fillStyle = '#fff8dc';
+      ctx.font = 'bold 13px system-ui,"Microsoft YaHei",sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(t('mj_void_label', '定缺:') + ' ' + vsLabel, startX, y - 22);
+      ctx.shadowColor = 'transparent';
+      // 小色点（亮色描边）— 与文字垂直居中对齐
+      ctx.fillStyle = vsColor;
+      ctx.strokeStyle = 'rgba(255,255,255,.9)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(startX - 10, y - 22, 6, 0, Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
     }
   }
 
-  // 公共出牌区：中央一个长方形区域，所有玩家按顺序从左到右、从上到下出牌
-  // 玩家 0 的牌先排，紧接玩家 1，以此类推（每玩家不同颜色标记通过间距区分）
-  // 按出牌时间顺序构建弃牌序列（第0轮各家第0张→第1轮各家第1张…）
+  // 公共出牌区：中央一堆，按全局出牌时间顺序追加（每张新牌都在末尾，不插入中间，不按花色归类）
   function buildDiscardSequence() {
     var seq = [];
     if (!_state.discards) return seq;
@@ -467,7 +545,7 @@
         seq.push({ tile: t, player: s, seq: t._discardSeq || 0 });
       }
     }
-    // 严格按出牌时间排序
+    // 按全局时间排序：保证每张新出的牌都在中央末尾，不会插入中间，也不按花色归类
     seq.sort(function(a, b) { return a.seq - b.seq; });
     return seq;
   }
@@ -475,16 +553,15 @@
   function drawDiscards() {
     var allTiles = buildDiscardSequence();
     if (allTiles.length === 0) return;
-    var dw = Math.round(TW * 0.55), dh = Math.round(TH * 0.55);
+    var dw = Math.round(TW * 0.52), dh = Math.round(TH * 0.52);
     var gap = 3;
-    // 出牌区尺寸：手机占更大比例以利用空间
     var isMobile = W < 500;
     var zoneW = W * (isMobile ? 0.88 : 0.56);
     var zoneH = H * (isMobile ? 0.40 : 0.34);
     var zoneX = (W - zoneW) / 2;
     var zoneY = (H - zoneH) / 2;
     var perRow = Math.max(6, Math.floor(zoneW / (dw + gap)));
-    // 在长方形区域内网格排列
+    // 中央网格：按全局时间从左到右、从上到下，新牌始终在末尾
     for (var idx = 0; idx < allTiles.length; idx++) {
       var row = Math.floor(idx / perRow);
       var col = idx % perRow;
@@ -990,14 +1067,26 @@
     var rect = canvas.getBoundingClientRect();
     var x = (e.clientX - rect.left) * (W / rect.width);
     var y = (e.clientY - rect.top) * (H / rect.height);
-    // 结算界面：点击"下一局"按钮 → 发送 restart
+    // 结算界面：本局结算面板内三按钮（下一局/返回房间/返回大厅）
     if (_state && _state.phase === 'over') {
       var panelW = Math.min(380, W - 40);
-      var panelH = 280;
+      var panelH = 340;
       var px = (W - panelW) / 2;
       var py = (H - panelH) / 2;
-      if (x >= W/2 - 60 && x <= W/2 + 60 && y >= py + panelH - 50 && y <= py + panelH - 14) {
-        if (window.makeGameMove) window.makeGameMove({ type: 'restart' });
+      // 下一局
+      if (x >= W/2 - 60 && x <= W/2 + 60 && y >= py + panelH - 90 && y <= py + panelH - 54) {
+        if (window.doRestart) window.doRestart();
+        else if (window.makeGameMove) window.makeGameMove({ type: 'restart' });
+        return;
+      }
+      // 返回房间
+      if (x >= W/2 - 115 && x <= W/2 - 15 && y >= py + panelH - 42 && y <= py + panelH - 14) {
+        if (window.doReturnToRoom) window.doReturnToRoom();
+        return;
+      }
+      // 返回大厅
+      if (x >= W/2 + 15 && x <= W/2 + 115 && y >= py + panelH - 42 && y <= py + panelH - 14) {
+        if (window.doLeaveRoom) window.doLeaveRoom();
         return;
       }
       return;
@@ -1021,7 +1110,7 @@
   function drawScorePanel() {
     if (!_state || _state.phase !== 'over') return;
     var panelW = Math.min(380, W - 40);
-    var panelH = 280;
+    var panelH = 340;
     var px = (W - panelW) / 2;
     var py = (H - panelH) / 2;
 
@@ -1043,13 +1132,18 @@
     ctx.font = 'bold 20px system-ui,"Microsoft YaHei",sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(t('mj_settlement', '本局结算'), W / 2, py + 32);
+    // 局数小字 — 与标题拉大间隔
+    var rn = _state.roundNumber || 1;
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
+    ctx.fillText(t('mj_round_label', '第') + rn + t('mj_round_unit', '局'), W / 2, py + 56);
 
     // 玩家列表
     var cumScore = _state.cumulativeScore || [0,0,0,0];
     var dealerIdx = _state.dealerIndex || 0;
     ctx.font = '14px system-ui,"Microsoft YaHei",sans-serif';
     for (var i = 0; i < _state.hands.length; i++) {
-      var yy = py + 60 + i * 36;
+      var yy = py + 72 + i * 36;
       var isDealer = (i === dealerIdx);
       var isWinner = (_state.winners || []).includes(i);
       ctx.fillStyle = isWinner ? '#e05050' : (isDealer ? '#c8a45c' : 'rgba(255,255,255,.85)');
@@ -1061,14 +1155,26 @@
       ctx.fillText(cumScore[i] + t('mj_score', '分'), px + panelW - 20, yy);
     }
 
-    // 下一局按钮
+    // 下一局按钮（主）
     ctx.fillStyle = '#c8a45c';
-    roundRect(W/2 - 60, py + panelH - 50, 120, 36, 10);
+    roundRect(W/2 - 60, py + panelH - 90, 120, 36, 10);
     ctx.fill();
     ctx.fillStyle = '#1a1a1a';
     ctx.font = 'bold 14px system-ui,"Microsoft YaHei",sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(t('mj_next_round', '下一局'), W / 2, py + panelH - 28);
+    ctx.fillText(t('mj_next_round', '下一局'), W / 2, py + panelH - 68);
+    // 返回房间 / 返回大厅（次级，置于面板内）— 间隔拉大不拥挤
+    ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.lineWidth = 1.5;
+    ctx.fillStyle = 'rgba(255,255,255,.08)';
+    roundRect(W/2 - 115, py + panelH - 42, 100, 28, 8);
+    ctx.fill(); ctx.stroke();
+    roundRect(W/2 + 15, py + panelH - 42, 100, 28, 8);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
+    ctx.fillText(t('mj_return_room', '返回房间'), W/2 - 65, py + panelH - 24);
+    ctx.fillText(t('mj_return_lobby', '返回大厅'), W/2 + 65, py + panelH - 24);
   }
 
   // 回调：接线到 makeGameMove（与 room-client 的 webSocket 通信）

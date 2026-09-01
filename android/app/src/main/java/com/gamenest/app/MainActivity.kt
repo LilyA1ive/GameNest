@@ -2,6 +2,7 @@ package com.gamenest.app
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
@@ -11,6 +12,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -19,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.updateLayoutParams
 import com.gamenest.app.databinding.ActivityMainBinding
 import java.io.File
@@ -34,6 +37,9 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val handler = Handler(Looper.getMainLooper())
+
+    /** True while a game requested landscape + hidden system bars (see WebAppBridge). */
+    private var immersive = false
 
     companion object {
         private const val TAG = "LocalGames"
@@ -115,6 +121,19 @@ class MainActivity : AppCompatActivity() {
         ws.loadWithOverviewMode = true
         ws.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         binding.webview.webViewClient = object : WebViewClient() {
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                // Always unlock on navigation: a page may leave via location.replace, which
+                // gives the old page no chance to release the lock, stranding us in landscape.
+                // Pages that want landscape re-request it once loaded — this runs before the
+                // new page's JS, so there is no race.
+                if (immersive) {
+                    immersive = false
+                    requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+                    applyImmersive(false)
+                }
+            }
+
             override fun onPageFinished(view: WebView, url: String?) {
                 super.onPageFinished(view, url)
                 view.evaluateJavascript("(function(){ return localStorage.getItem('lang') || 'zh'; })()") { result ->
@@ -127,6 +146,53 @@ class MainActivity : AppCompatActivity() {
             }
         }
         binding.webview.webChromeClient = WebChromeClient()
+        binding.webview.addJavascriptInterface(WebAppBridge(), "GameNestNative")
+    }
+
+    /**
+     * Bridge exposed to the WebView as `window.GameNestNative`.
+     * Only our own localhost pages are ever loaded, so this is not a remote-content risk.
+     */
+    inner class WebAppBridge {
+        /**
+         * Called by the web app when entering/leaving a game that wants the full screen
+         * (currently Mahjong). Locks landscape and hides the system bars + the LAN-URL bar.
+         */
+        @JavascriptInterface
+        fun setImmersiveLandscape(on: Boolean) {
+            runOnUiThread {
+                requestedOrientation = if (on) {
+                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                } else {
+                    ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+                }
+                immersive = on
+                applyImmersive(on)
+            }
+        }
+    }
+
+    /**
+     * Hides/shows the system bars and our own LAN-URL status bar.
+     * Bars stay swipe-accessible in immersive mode (BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE).
+     */
+    private fun applyImmersive(on: Boolean) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        if (on) {
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            binding.statusBar.visibility = View.GONE
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+            binding.statusBar.visibility = View.VISIBLE
+        }
+    }
+
+    /** The system restores the bars on focus loss (notification shade, dialogs) — re-apply. */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && immersive) applyImmersive(true)
     }
 
     /** Polls http://localhost:3000 until the HTTP server responds, then loads it. */

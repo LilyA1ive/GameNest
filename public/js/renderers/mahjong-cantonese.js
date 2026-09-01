@@ -8,7 +8,11 @@
   var _state = null, _playerIndex = 0, _winner = null;
   var _tiles = []; // clickable hand tiles: [{ x, y, w, h, tile }]
   var _hoverId = null;
+  var _lastDrawnId = null;
+  var _drawPulse = 0;
+  var _animTimer = null;
   var _claimBtns = []; // claim button rects: [{ x, y, w, h, action }]
+var _resizeBound = false;  // 渲染器是单例，每局结束重开都会再调 init，resize 只能挂一次
 
   // Honour display names
   var HONOUR = { 'feng': ['', '东', '南', '西', '北'], 'jian': ['', '中', '发', '白'] };
@@ -59,7 +63,11 @@
 
       ctx = canvas.getContext('2d');
       resize();
-      window.addEventListener('resize', resize);
+      // 设置 canvas.width 会清空画布，必须紧接着重绘，否则旋转屏幕后白屏
+      if (!_resizeBound) {
+        window.addEventListener('resize', function() { resize(); draw(); });
+        _resizeBound = true;
+      }
       canvas.addEventListener('click', onClick);
       canvas.addEventListener('mousemove', onMove);
     },
@@ -73,7 +81,7 @@
   });
 
   function resize() {
-    dpr = window.devicePixelRatio || 1;
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
     W = window.innerWidth;
     H = window.innerHeight;
     canvas.width = W * dpr;
@@ -88,7 +96,24 @@
 
   // ---- drawing ----
 
+  function startAnimLoop() {
+    if (_animTimer) return;
+    var tick = function() {
+      var active = false;
+      if (_drawPulse > 0.01) { _drawPulse *= 0.88; if (_drawPulse < 0.02) _drawPulse = 0; active = true; }
+      if (!active) { _animTimer = null; draw(); return; }
+      draw();
+      _animTimer = requestAnimationFrame(tick);
+    };
+    _animTimer = requestAnimationFrame(tick);
+  }
+
   function draw() {
+    // 检测新摸牌 → 青蓝脉冲（与黄色轮到你区分）
+    if (_state && _state.drawn && _state.drawn !== _lastDrawnId && _state.currentPlayer === _playerIndex && _state.phase === 'play') {
+      _lastDrawnId = _state.drawn; _drawPulse = 1; startAnimLoop();
+    }
+    if (_state && !_state.drawn) { _lastDrawnId = null; _drawPulse = 0; }
     ctx.clearRect(0, 0, W, H);
     if (!_state || !_state.hands) return;
     var n = _state._playerCount || 4;
@@ -129,12 +154,17 @@
   }
 
   function tileFace(x, y, w, h, tile, highlight) {
+    // highlight: 0/false none, 1/true gold hover, 2/'drawn' cyan new-draw (distinct from yellow turn)
+    var isHover = highlight === 1 || highlight === true || highlight === 'hover';
+    var isDrawn = highlight === 2 || highlight === 'drawn';
     // body
-    ctx.fillStyle = highlight ? '#fffbe6' : '#fdfcf5';
+    if (isDrawn) ctx.fillStyle = '#ecfeff';
+    else ctx.fillStyle = isHover ? '#fffbe6' : '#fdfcf5';
     roundRect(x, y, w, h, 6);
     ctx.fill();
-    ctx.strokeStyle = highlight ? '#c8a45c' : '#d8ccb0';
-    ctx.lineWidth = highlight ? 2.5 : 1.5;
+    if (isDrawn) ctx.strokeStyle = '#06b6d4';
+    else ctx.strokeStyle = isHover ? '#c8a45c' : '#d8ccb0';
+    ctx.lineWidth = (isHover || isDrawn) ? 2.5 : 1.5;
     ctx.stroke();
 
     if (tile.k === 'feng' || tile.k === 'jian') {
@@ -208,9 +238,35 @@
       if (Array.isArray(hand)) {
         for (var i = 0; i < hand.length; i++) {
           var x = sx + i * (tw + gap);
+          var isDrawn = _state.drawn && hand[i].id === _state.drawn && _state.currentPlayer === _playerIndex && _state.phase === 'play';
           var hover = _hoverId === hand[i].id;
-          var ty = hover ? sy - 10 : sy;
-          tileFace(x, ty, tw, th, hand[i], hover);
+          var ty = hover ? sy - 10 : (isDrawn ? sy - 8 : sy);
+          // 青蓝外发光（与黄色回合区分）
+          if (isDrawn && _drawPulse > 0.01) {
+            ctx.save();
+            ctx.shadowColor = 'rgba(6,182,212,' + (0.65 * _drawPulse) + ')';
+            ctx.shadowBlur = 14 + 8 * _drawPulse;
+            ctx.fillStyle = 'rgba(6,182,212,' + (0.10 * _drawPulse) + ')';
+            ctx.beginPath();
+            ctx.roundRect ? ctx.roundRect(x - 3, ty - 3, tw + 6, th + 6, 8) : (ctx.rect(x-3,ty-3,tw+6,th+6));
+            ctx.fill();
+            ctx.restore();
+          }
+          var hl = hover ? 1 : (isDrawn ? 2 : 0);
+          tileFace(x, ty, tw, th, hand[i], hl);
+          if (isDrawn) {
+            ctx.save();
+            ctx.fillStyle = '#06b6d4';
+            ctx.beginPath();
+            ctx.arc(x + tw - 7, ty + 7, 7, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 8px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('新', x + tw - 7, ty + 7.5);
+            ctx.restore();
+          }
           _tiles.push({ x: x, y: ty, w: tw, h: th, tile: hand[i] });
         }
       }
@@ -242,7 +298,7 @@
     }
   }
 
-  // 按出牌时间顺序构建弃牌序列（严格时间序）
+  // 按出牌先后：每家各自顺序追加，新牌在该家末尾，不插入中间
   function buildDiscardSequence() {
     var seq = [];
     if (!_state.discards) return seq;
@@ -252,7 +308,7 @@
         seq.push({ tile: t, player: s, seq: t._discardSeq || 0 });
       }
     }
-    seq.sort(function(a, b) { return a.seq - b.seq; });
+    // 不再全局排序：按玩家分段追加，已是每家先后顺序
     return seq;
   }
 
@@ -321,6 +377,54 @@
       ctx.font = 'bold 16px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(msg, W / 2, H / 2 + 120);
+      // 买码翻牌动画：4 张牌依次翻面+金光
+      if (s.winInfo.buyTiles && s.winInfo.buyTiles.length) {
+        var now = Date.now();
+        if (!_state._buyStart) _state._buyStart = now;
+        var elapsed = now - _state._buyStart;
+        var tw = 42, th = 58, gap = 8;
+        var totalW = s.winInfo.buyTiles.length * tw + (s.winInfo.buyTiles.length - 1) * gap;
+        var sx = W / 2 - totalW / 2, sy = H / 2 + 140;
+        for (var i = 0; i < s.winInfo.buyTiles.length; i++) {
+          var tile = s.winInfo.buyTiles[i];
+          var delay = i * 220;
+          var p = Math.min(1, Math.max(0, (elapsed - delay) / 420));
+          var flip = p < 0.5 ? (1 - p * 1.6) : ((p - 0.5) * 1.6);
+          var w = Math.max(6, tw * Math.abs(flip));
+          var x = sx + i * (tw + gap) + (tw - w) / 2;
+          var isHonour = tile.k === 'feng' || tile.k === 'jian';
+          var isBonus = isHonour;
+          // 外发光（中奖牌）
+          if (isBonus && p > 0.5) {
+            ctx.save();
+            ctx.shadowColor = 'rgba(255,215,0,0.9)';
+            ctx.shadowBlur = 14 + 6 * Math.sin(elapsed / 180 + i);
+            ctx.fillStyle = 'rgba(255,215,0,0.18)';
+            ctx.fillRect(x - 3, sy - 3, w + 6, th + 6);
+            ctx.restore();
+          }
+          if (p < 0.5) {
+            // 背面
+            ctx.fillStyle = '#2a5c50';
+            ctx.fillRect(x, sy, w, th);
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.strokeRect(x, sy, w, th);
+          } else {
+            // 正面
+            ctx.fillStyle = isBonus ? '#fff9d6' : '#fffef6';
+            ctx.fillRect(x, sy, w, th);
+            ctx.strokeStyle = isBonus ? '#c8a45c' : 'rgba(0,0,0,0.15)';
+            ctx.lineWidth = isBonus ? 2 : 1;
+            ctx.strokeRect(x, sy, w, th);
+            ctx.fillStyle = isBonus ? '#8e44ad' : '#222';
+            ctx.font = 'bold ' + Math.floor(th * 0.38) + 'px sans-serif';
+            ctx.textAlign = 'center';
+            var name = tile.k === 'feng' ? (['','东','南','西','北'][tile.n]||'') : tile.k === 'jian' ? (['','中','发','白'][tile.n]||'') : (tile.n + (tile.k==='wan'?'万':tile.k==='tong'?'筒':'条'));
+            ctx.fillText(name, x + w/2, sy + th/2 + 5);
+          }
+        }
+        if (elapsed < 1800) requestAnimationFrame(function(){ if(_state && _state.winInfo) draw(); });
+      }
       return;
     }
     var msg = '';

@@ -136,6 +136,14 @@ app.get('/network-info', (req, res) => {
   });
 });
 
+// 调试接口默认关闭：/api/debug/room/:id 会 dump 原始 state（绕过 playerView，
+// 暴露所有玩家手牌），forceWin 还能直接改判胜负。本地排查用 GAMENEST_DEBUG=1 node server.js 开启。
+const DEBUG_API = process.env.GAMENEST_DEBUG === '1';
+app.use('/api/debug', (req, res, next) => {
+  if (!DEBUG_API) return res.status(404).json({ error: 'not found' });
+  next();
+});
+
 // Debug: list active rooms (no sensitive hand data)
 app.get('/api/debug/rooms', (req, res) => {
   const list = [];
@@ -166,10 +174,14 @@ app.get('/api/debug/room/:roomId', (req, res) => {
     phase: state.phase,
     currentPlayer: state.currentPlayer,
     winners: state.winners,
+    winner: state.winner,
+    winInfo: state.winInfo,
     cumulativeScore: state.cumulativeScore,
     roundNumber: state.roundNumber,
     dealerIndex: state.dealerIndex,
     deckCount: state.deck ? state.deck.length : (state.wall ? state.wall.length : 0),
+    wall: state.wall ? state.wall.length : undefined,
+    drawn: state.drawn,
     voidSuit: state.voidSuit || [],
     _winSelfDraw: state._winSelfDraw,
     hands: state.hands,
@@ -188,7 +200,103 @@ app.get('/api/debug/room/:roomId', (req, res) => {
       }
     }
   }
+  if (state.winInfo) dump.winInfo = state.winInfo;
   res.json(dump);
+});
+
+// Debug: force win for player 0 (摆必赢，验积分板加分)
+app.post('/api/debug/room/:roomId/forceWin', express.json(), (req, res) => {
+  const room = rooms.get(req.params.roomId);
+  if (!room) return res.json({ error: 'room not found' });
+  const state = room.state;
+  try {
+    const isCantonese = !!state.wall; // 广东有 wall，四川有 deck/voidSuit
+    if (!isCantonese) {
+      // 四川必赢：1w2w3w 4w5w6w 7w8w9w 1t1t1t 2t2t (清一色+碰) 缺 tong，非血战一胡即结束以验积分
+      function T(k,n,id){ return {k,n,id}; }
+      state.hands[0]=[
+        T('wan',1,901),T('wan',2,902),T('wan',3,903),
+        T('wan',4,904),T('wan',5,905),T('wan',6,906),
+        T('wan',7,907),T('wan',8,908),T('wan',9,909),
+        T('tiao',1,910),T('tiao',1,911),T('tiao',1,912),
+        T('tiao',2,913),T('tiao',2,914),
+      ];
+      // 定缺已完成，缺 tong，且手牌不含 tong 才能胡
+      for(let i=0;i<state.hands.length;i++) state.voidSuit[i]='tong';
+      state._bloodBattle=false;
+      state.phase='play'; state.currentPlayer=0; state.drawn=state.hands[0][13].id;
+      const mod=require('./games/mahjong-sichuan');
+      const err=mod.handleMove({type:'win'}, state, 0);
+      if(err) return res.json({ error: err, state });
+      checkMahjongRoundEnd(room);
+      broadcastGameView(room);
+      return res.json({ ok:true, winners: state.winners, winner: state.winner, winInfo: state.winInfo, cumulativeScore: state.cumulativeScore, phase: state.phase, roundScores: state._lastRoundScores });
+    } else if (isCantonese) {
+      // 广东必赢：123m456m789m 222s 11s + 自摸
+      const core=require('./games/lib/mahjong-core');
+      let _tid=9000;
+      function CT(k,n){ return {k,n,id:k+n+'#'+(_tid++)};}
+      function hand(str){
+        const tiles=[]; let nums='';
+        for(const ch of str){ if(ch>='0'&&ch<='9'){nums+=ch; continue;} let k;
+          if(ch==='m') k='wan'; else if(ch==='s') k='tiao'; else if(ch==='p') k='tong'; else continue;
+          for(const n of nums) tiles.push(CT(k, parseInt(n))); nums='';
+        } return tiles;
+      }
+      state.hands[0]=hand('1m 2m 3m 4m 5m 6m 7m 8m 9m 2s 2s 2s 1s 1s');
+      state.phase='play'; state.currentPlayer=0; state.hasDrawn=true; state.drawn=state.hands[0][13].id;
+      const mod=require('./games/mahjong-cantonese');
+      const err=mod.handleMove({type:'win'}, state, 0);
+      if(err) return res.json({ error: err, state });
+      checkMahjongRoundEnd(room);
+      broadcastGameView(room);
+      return res.json({ ok:true, winner: state.winner, winInfo: state.winInfo, cumulativeScore: state.cumulativeScore, phase: state.phase });
+    } else {
+      return res.json({ error: 'not mahjong' });
+    }
+  } catch(e){ return res.json({ error: e.message, stack: e.stack }); }
+});
+
+// Debug: next round (proper game_restart preserving cumulativeScore)
+app.post('/api/debug/room/:roomId/nextRound', express.json(), (req, res) => {
+  const room = rooms.get(req.params.roomId);
+  if (!room) return res.json({ error: 'room not found' });
+  const gameMod = gameRegistry[room.game];
+  if (!gameMod) return res.json({ error: 'no gameMod' });
+  const totalPlayers = room.players.size + (room.bots ? room.bots.size : 0);
+  var prevMJ = null;
+  if (room.state && (room.game === 'mahjong-sichuan' || room.game === 'mahjong-cantonese')) {
+    prevMJ = {
+      cumulativeScore: room.state.cumulativeScore,
+      dealerIndex: room.state.dealerIndex,
+      roundNumber: room.state.roundNumber,
+      winners: room.state.winners,
+      winner: room.state.winner,
+    };
+  }
+  room.state = gameMod.createState();
+  applyRuntimeState(room, totalPlayers);
+  if (gameMod && gameMod.initGame) gameMod.initGame(room.state, totalPlayers);
+  if (prevMJ) {
+    room.state.cumulativeScore = prevMJ.cumulativeScore || new Array(totalPlayers).fill(0);
+    var nextDealer;
+    var hadWinner = false;
+    if (prevMJ.winners && prevMJ.winners.length > 0 && prevMJ.winners[0] >= 0) {
+      nextDealer = prevMJ.winners[0];
+      hadWinner = true;
+    } else if (prevMJ.winner != null && prevMJ.winner >= 0) {
+      nextDealer = prevMJ.winner;
+      hadWinner = true;
+    }
+    if (!hadWinner) {
+      nextDealer = ((prevMJ.dealerIndex || 0) + 1) % totalPlayers;
+    }
+    room.state.dealerIndex = nextDealer;
+    room.state.roundNumber = (prevMJ.roundNumber || 1) + 1;
+  }
+  broadcastGameView(room);
+  broadcastRoom(room, { type: 'game_restart', state: room.state });
+  return res.json({ ok:true, phase: room.state.phase, cumulativeScore: room.state.cumulativeScore, roundNumber: room.state.roundNumber, dealerIndex: room.state.dealerIndex });
 });
 
 logStep('[android-node] server.js init http/ws server');

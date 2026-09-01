@@ -108,7 +108,9 @@ jobs:
             |---|---|---|
             | **GameNest-Windows.exe** | Windows 7+ | Standalone executable (no Node.js needed). Double-click to start server, browser opens automatically. |
             | **GameNest-Portable.zip** | Any OS | Source code + launcher scripts. Requires Node.js 18+. Run `npm install && node desktop-entry.js`. |
-            | **app-debug.apk** | Android 8+ | Install APK on an Android phone to host games on the same WiFi. |
+            | **app-arm64-v8a-debug.apk** | Android 8+ (64-bit) | For virtually every phone made since ~2016. **Pick this one if unsure about your phone's age.** |
+            | **app-armeabi-v7a-debug.apk** | Android 8+ (32-bit) | Only for older 32-bit devices. |
+            | **app-universal-debug.apk** | Android 8+ (any) | Contains both architectures — larger, but works everywhere. |
 
             ### Desktop quick start
 
@@ -123,6 +125,8 @@ jobs:
 
             Open the lobby at `http://localhost:3000`, or share `http://<host-ip>:3000` with other devices on the same WiFi.
           files: |
-            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+            android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
+            android/app/build/outputs/apk/debug/app-universal-debug.apk
             dist/GameNest-Windows.exe
             dist/GameNest-Portable.zip

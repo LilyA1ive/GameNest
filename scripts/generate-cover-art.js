@@ -45,7 +45,6 @@ const covers = [
   { id: '2048', palette: ['#f5f1e8', '#d9cbb0', '#edc22e', '#2a2418'], motif: '2048' },
   { id: 'sudoku', palette: ['#f2f0ea', '#c9d4de', '#6d8fb0', '#182231'], motif: 'sudoku' },
   { id: 'mahjong-sichuan', palette: ['#f4efe7', '#c7d0c6', '#2f7a55', '#14231a'], motif: 'mahjong' },
-  { id: 'sanguosha', palette: ['#f2e8df', '#d1b698', '#b0543c', '#1e130c'], motif: 'sanguosha' },
 ];
 
 function ensureDir(dirPath) {
@@ -425,13 +424,6 @@ function motifSvg(cover) {
         ${block(1210, 680, 130, 190, 18, '#f5e9d0')}
         ${circle(1135, 360, 30, accent, 0.85)}
         ${circle(1215, 800, 26, dark, 0.6)}
-      `;
-    case 'sanguosha':
-      return `
-        <g transform="rotate(-16 1130 460)">${block(1010, 300, 200, 320, 24, '#fff6ec')}</g>
-        <g transform="rotate(8 1210 420)">${block(1100, 260, 200, 320, 24, '#b0543c', 0.92)}</g>
-        <g transform="rotate(22 1300 480)">${block(1200, 320, 200, 320, 24, '#2f6a4a', 0.9)}</g>
-        ${circle(1155, 700, 66, '#fff', 0.94)}
       `;
     default:
       return '';

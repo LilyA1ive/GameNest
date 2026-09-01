@@ -313,23 +313,4 @@ module.exports = {
   'mj_choose_swap': 'Select 3 same-suit tiles to swap',
   'mj_bad_swap': 'Invalid swap (need 3 same-suit tiles)',
 
-  // Sanguosha (sgs_)
-  'sgs_sha_limit': 'Only 1 Slash per turn (unlimited with Crossbow)',
-  'sgs_need_target': 'Need to select a target',
-  'sgs_target_dead': 'Target is already dead',
-  'sgs_target_self': 'Cannot target yourself',
-  'sgs_out_of_range': 'Target out of range',
-  'sgs_full_hp': 'HP already full',
-  'sgs_wine_used': 'Wine already used this turn',
-  'sgs_invalid_target': 'Invalid target',
-  'sgs_card_not_found': 'Card not in hand',
-  'sgs_unknown_card': 'Unknown card',
-  'sgs_invalid_move': 'Invalid move',
-  'sgs_seat_missing': 'Seat not found',
-  'sgs_already_chosen': 'General already chosen',
-  'sgs_invalid_general': 'Not a valid candidate general',
-  'sgs_draw_first': 'Draw first',
-  'sgs_discard_count': 'Wrong number of cards to discard',
-  'sgs_must_discard': 'Must discard down to HP first',
-  'sgs_invalid_phase': 'Not allowed in current phase',
 };

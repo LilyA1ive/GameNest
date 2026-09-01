@@ -8,7 +8,7 @@
       description: '适合两个人热身的一分钟对局。',
       players: '2人',
       duration: '约1分钟',
-      category: '经典棋盘',
+      category: '棋盘对弈',
       tags: ['快节奏', '新手友好'],
     },
     gomoku: {
@@ -17,7 +17,7 @@
       description: '更稳更长线的经典落子博弈。',
       players: '2人',
       duration: '约5分钟',
-      category: '经典棋盘',
+      category: '棋盘对弈',
       tags: ['策略', '对弈'],
     },
     davinci: {
@@ -26,7 +26,7 @@
       description: '通过数字与颜色推断对手隐藏牌。',
       players: '2-6人',
       duration: '约15分钟',
-      category: '推理卡牌',
+      category: '牌桌竞技',
       tags: ['推理', '读心'],
     },
     uno: {
@@ -35,7 +35,7 @@
       description: '轻松上手，适合聚会里的热闹一桌。',
       players: '2-6人',
       duration: '约10分钟',
-      category: '派对卡牌',
+      category: '派对同乐',
       tags: ['经典', '聚会'],
     },
     doudizhu: {
@@ -44,7 +44,7 @@
       description: '经典三人扑克，带 AI 也能随时开局。',
       players: '2-3人',
       duration: '约10分钟',
-      category: '扑克竞技',
+      category: '牌桌竞技',
       tags: ['经典', '三人局'],
     },
     'exploding-kittens': {
@@ -53,7 +53,7 @@
       description: '轻派对向的运气与道具牌博弈。',
       players: '2-6人',
       duration: '约15分钟',
-      category: '派对卡牌',
+      category: '派对同乐',
       tags: ['欢乐', '反转'],
     },
     rummikub: {
@@ -62,7 +62,7 @@
       description: '一边排数字，一边重构桌面组合。',
       players: '2-4人',
       duration: '约15分钟',
-      category: '桌面策略',
+      category: '牌桌竞技',
       tags: ['组合', '耐玩'],
     },
     sudoku: {
@@ -71,7 +71,7 @@
       description: '同一道题，比拼谁先填满所有空格。',
       players: '2-4人',
       duration: '约5分钟',
-      category: '脑力竞速',
+      category: '脑力闯关',
       tags: ['逻辑', '多人同屏'],
     },
     '2048': {
@@ -80,7 +80,7 @@
       description: '同一起点，比拼谁先合成2048。',
       players: '2-4人',
       duration: '约5分钟',
-      category: '脑力竞速',
+      category: '脑力闯关',
       tags: ['数字', '多人同屏'],
     },
     twentyfour: {
@@ -89,7 +89,7 @@
       description: '适合一群人一起拼脑速的快节奏竞速题。',
       players: '2-6人',
       duration: '约5分钟',
-      category: '脑力竞速',
+      category: '脑力闯关',
       tags: ['计算', '多人同屏'],
     },
     minesweeper: {
@@ -98,7 +98,7 @@
       description: '同一雷区比手感，紧张感很直接。',
       players: '2-6人',
       duration: '约5分钟',
-      category: '脑力竞速',
+      category: '脑力闯关',
       tags: ['速度', '观察'],
     },
     numberbomb: {
@@ -107,7 +107,7 @@
       description: '社交局里最容易瞬间上头的猜数字小游戏。',
       players: '2-10人',
       duration: '约10分钟',
-      category: '派对卡牌',
+      category: '派对同乐',
       tags: ['社交', '猜测'],
     },
     oldmaid: {
@@ -116,7 +116,7 @@
       description: '非常适合多人放松局的轻卡牌玩法。',
       players: '2-6人',
       duration: '约15分钟',
-      category: '派对卡牌',
+      category: '派对同乐',
       tags: ['轻松', '多人'],
     },
     liarsbar: {
@@ -125,7 +125,7 @@
       description: '半 bluff 半社交，心理战味道很足。',
       players: '2-6人',
       duration: '约15分钟',
-      category: '推理卡牌',
+      category: '牌桌竞技',
       tags: ['心理战', '嘴炮'],
     },
     bigtwo: {
@@ -134,7 +134,7 @@
       description: '节奏干脆的传统扑克对抗。',
       players: '2-4人',
       duration: '约10分钟',
-      category: '扑克竞技',
+      category: '牌桌竞技',
       tags: ['出牌博弈', '传统'],
     },
     'mahjong-sichuan': {
@@ -143,7 +143,7 @@
       description: '国粹麻将，支持四川血战到底与广东鸡平胡两种打法。',
       players: '2-4人',
       duration: '约20分钟',
-      category: '国粹麻将',
+      category: '牌桌竞技',
       tags: ['麻将', '策略'],
     },
     texas: {
@@ -152,7 +152,7 @@
       description: '最适合做成夜局气氛的一桌扑克。',
       players: '2-8人',
       duration: '约20分钟',
-      category: '扑克竞技',
+      category: '牌桌竞技',
       tags: ['筹码', '博弈'],
     },
     flightchess: {
@@ -161,7 +161,7 @@
       description: '最适合家庭局和朋友局的轻竞争棋盘。',
       players: '2-4人',
       duration: '约10分钟',
-      category: '经典棋盘',
+      category: '派对同乐',
       tags: ['家庭局', '轻松'],
     },
     snakebattle: {
@@ -179,7 +179,7 @@
       description: '双人长线对弈，适合沉浸式下棋。',
       players: '2人',
       duration: '约20分钟',
-      category: '经典棋盘',
+      category: '棋盘对弈',
       tags: ['深度', '传统'],
     },
     chess: {
@@ -188,7 +188,7 @@
       description: '完整 FIDE 规则的双人国际象棋。',
       players: '2人',
       duration: '约15分钟',
-      category: '经典棋盘',
+      category: '棋盘对弈',
       tags: ['深度', '经典'],
     },
     checkers: {
@@ -197,7 +197,7 @@
       description: '8×8 经典跳棋，连吃与升王。',
       players: '2人',
       duration: '约10分钟',
-      category: '经典棋盘',
+      category: '棋盘对弈',
       tags: ['经典', '易学'],
     },
     connect4: {
@@ -206,7 +206,7 @@
       description: '7×6 经典重力棋，全家欢乐。',
       players: '2人',
       duration: '约5分钟',
-      category: '经典棋盘',
+      category: '棋盘对弈',
       tags: ['亲子', '快节奏'],
     },
     reversi: {
@@ -215,7 +215,7 @@
       description: '8×8 Othello，一步翻盘。',
       players: '2人',
       duration: '约10分钟',
-      category: '经典棋盘',
+      category: '棋盘对弈',
       tags: ['策略', '反转'],
     },
     go9: {
@@ -224,7 +224,7 @@
       description: '更快结束的小棋盘围棋，非常适合线上玩。',
       players: '2人',
       duration: '约15分钟',
-      category: '经典棋盘',
+      category: '棋盘对弈',
       tags: ['围地', '短局'],
     },
     monopoly: {
@@ -233,7 +233,7 @@
       description: '买地建房加事件卡，谁经营到最后？',
       players: '2-6人',
       duration: '约20分钟',
-      category: '桌面策略',
+      category: '派对同乐',
       tags: ['经营', '事件卡'],
     },
     suikabattle: {
@@ -251,7 +251,7 @@
       description: '层叠三消，和对手比拼清盘速度。',
       players: '2-6人',
       duration: '约10分钟',
-      category: '脑力竞速',
+      category: '脑力闯关',
       tags: ['消除', '堆叠'],
     },
     drawguess: {
@@ -260,7 +260,7 @@
       description: '传话接龙式猜词，画得越歪越好笑。',
       players: '2-8人',
       duration: '约15分钟',
-      category: '派对卡牌',
+      category: '派对同乐',
       tags: ['社交', '欢乐'],
     },
     battleship: {
@@ -269,7 +269,7 @@
       description: '经典双人海战策略，在10×10棋盘上隐藏与猎杀。',
       players: '2人',
       duration: '约15分钟',
-      category: '经典棋盘',
+      category: '棋盘对弈',
       tags: ['策略', '对弈'],
     },
     hearts: {
@@ -278,17 +278,8 @@
       description: '经典 4 人吃墩牌局，红心 1 分黑桃 Q 13 分。',
       players: '4人',
       duration: '约20分钟',
-      category: '扑克竞技',
+      category: '牌桌竞技',
       tags: ['吃墩', '策略'],
-    },
-    sanguosha: {
-      name: '三国杀',
-      subtitle: '身份局，主公与反贼对决',
-      description: '经典身份局：主公、忠臣、反贼、内奸，杀与闪的智谋对决。',
-      players: '4-8人',
-      duration: '约20分钟',
-      category: '国粹棋牌',
-      tags: ['身份', '策略', '多人'],
     },
     truthdare: {
       name: '真心话大冒险',
@@ -296,7 +287,7 @@
       description: '多种主题卡组，聚会暖场必备。',
       players: '2-10人',
       duration: '约15分钟',
-      category: '派对聚会',
+      category: '派对同乐',
       tags: ['社交', '轻松'],
     },
   };

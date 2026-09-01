@@ -313,23 +313,4 @@ module.exports = {
   'mj_choose_swap': '请选择3张同色牌交换',
   'mj_bad_swap': '无效的换牌（需3张同色牌）',
 
-  // Sanguosha (sgs_)
-  'sgs_sha_limit': '只能出 1 张杀（装备诸葛连弩可无限）',
-  'sgs_need_target': '需要选择目标',
-  'sgs_target_dead': '目标已死亡',
-  'sgs_target_self': '不能以自己为目标',
-  'sgs_out_of_range': '目标距离不够',
-  'sgs_full_hp': '体力已满，无需使用桃',
-  'sgs_wine_used': '本回合已经用过酒',
-  'sgs_invalid_target': '无效的目标',
-  'sgs_card_not_found': '手牌中没有这张牌',
-  'sgs_unknown_card': '未知的牌',
-  'sgs_invalid_move': '无效操作',
-  'sgs_seat_missing': '座位不存在',
-  'sgs_already_chosen': '已经选过武将',
-  'sgs_invalid_general': '不是可选的武将',
-  'sgs_draw_first': '请先摸牌',
-  'sgs_discard_count': '弃牌数量不对',
-  'sgs_must_discard': '必须弃牌后才能结束',
-  'sgs_invalid_phase': '当前阶段不能如此操作',
 };

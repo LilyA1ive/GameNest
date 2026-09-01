@@ -100,6 +100,16 @@ exports.createBot = function (playerIndex) {
         if (core.huCheck(hand, state.melds[playerIndex], CANTONESE).win) {
           return { type: 'win' };
         }
+        // 暗杠：4 张相同牌（数字牌），且不是听牌倾向时杠出（避免破坏听牌结构）
+        const quadT = findQuad(hand);
+        if (quadT && quadT.k !== 'feng' && quadT.k !== 'jian' && !isTing(hand, state.melds[playerIndex])) {
+          return { type: 'selfkong', suit: quadT.k, num: quadT.n };
+        }
+        // 补杠：有碰的刻子 + 摸到第 4 张
+        const addK = findAddKongTile(hand, state.melds[playerIndex]);
+        if (addK && addK.k !== 'feng' && addK.k !== 'jian' && !isTing(hand, state.melds[playerIndex])) {
+          return { type: 'addkong', suit: addK.k, num: addK.n };
+        }
         // discard the least-connected tile
         let worst = hand[0], worstScore = Infinity;
         for (const t of hand) {
@@ -113,3 +123,42 @@ exports.createBot = function (playerIndex) {
     },
   };
 };
+
+// 找手中有 4 张相同的牌（用于暗杠）
+function findQuad(hand) {
+  const counts = {};
+  for (const t of hand) {
+    const key = t.k + ':' + t.n;
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  for (const key in counts) {
+    if (counts[key] >= 4) {
+      const [k, n] = key.split(':');
+      return { k, n: parseInt(n, 10) };
+    }
+  }
+  return null;
+}
+
+// 补杠：碰出的刻子 + 手中有第 4 张
+function findAddKongTile(hand, melds) {
+  if (!Array.isArray(melds)) return null;
+  for (const m of melds) {
+    if (m.type !== 'pung') continue;
+    const r = m.tile || (m.tiles && m.tiles[0]);
+    if (!r) continue;
+    if (hand.some(t => t.k === r.k && t.n === r.n)) return { k: r.k, n: r.n };
+  }
+  return null;
+}
+
+// 是否已听牌（距胡牌差 1 张）——听牌时优先保留暗杠结构，不杠
+function isTing(hand, melds) {
+  for (const k of ['wan', 'tong', 'tiao']) {
+    for (let n = 1; n <= 9; n++) {
+      const test = hand.concat([{ k, n, id: 'test' }]);
+      if (core.huCheck(test, melds, CANTONESE).win) return true;
+    }
+  }
+  return false;
+}

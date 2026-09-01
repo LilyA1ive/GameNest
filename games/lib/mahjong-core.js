@@ -175,16 +175,24 @@ function countFanDetailed(hand, melds, winInfo, cfg, options) {
   if (winInfo && winInfo.type === 'qidui') {
     details.push({ name: '七对', fan: cfg.honours ? 2 : 4 });
   }
-  // 对对和 (all pungs, no chows) — approximation
+  // 对对和 (all pungs/kongs, no chows) — must verify every meld is a pung or kong
   if (winInfo && winInfo.type === 'standard' && melds && melds.length >= 3) {
-    details.push({ name: '对对和', fan: 2 });
-  }
-  // 断幺九 (no terminals or honours)
-  var hasTerminal = false;
-  for (var i2 = 0; i2 < hand.length; i2++) {
-    if (hand[i2].k === 'feng' || hand[i2].k === 'jian' || hand[i2].n === 1 || hand[i2].n === 9) {
-      hasTerminal = true; break;
+    var allPung = true;
+    for (var mp = 0; mp < melds.length; mp++) {
+      if (melds[mp].type !== 'pung' && melds[mp].type !== 'kong') { allPung = false; break; }
     }
+    if (allPung) details.push({ name: '对对和', fan: 2 });
+  }
+  // 断幺九 (no terminals or honours) — check concealed hand AND exposed meld tiles
+  var hasTerminal = false;
+  var termCheck = function(t) {
+    if (t.k === 'feng' || t.k === 'jian' || t.n === 1 || t.n === 9) hasTerminal = true;
+  };
+  for (var i2 = 0; i2 < hand.length; i2++) termCheck(hand[i2]);
+  if (!hasTerminal && melds) for (var mm = 0; mm < melds.length; mm++) {
+    var md = melds[mm];
+    if (md.tile) termCheck(md.tile);
+    if (md.tiles) for (var mt = 0; mt < md.tiles.length; mt++) termCheck(md.tiles[mt]);
   }
   if (!hasTerminal) details.push({ name: '断幺', fan: 1 });
   // 自摸

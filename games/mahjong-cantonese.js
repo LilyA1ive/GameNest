@@ -93,6 +93,9 @@ exports.initGame = function (state, playerCount) {
   state._buyTiles = opt.mj_buyTiles !== false; // default true
   state._maxFan = opt.mj_maxFan || 0; // 0 = no cap
   state._minFan = opt.mj_minFan || 0; // 0 = no minimum
+  // Server writes the next dealer into state.dealerIndex before initGame. Use it
+  // to extend the deal and set the starting player; fall back to 0 for round 1.
+  const dealer = state.dealerIndex || 0;
   const deck = core.buildDeck(CANTONESE);
   state.wall = deck;
   state.hands = [];
@@ -110,8 +113,8 @@ exports.initGame = function (state, playerCount) {
     }
   }
   for (let i = 0; i < playerCount; i++) sortHand(state.hands[i]);
-  state.dealer = 0;
-  state.currentPlayer = 0;
+  state.dealer = dealer;
+  state.currentPlayer = dealer;
   state.winner = null;
   state.winInfo = null;
   state.lastDiscard = null;
@@ -119,7 +122,7 @@ exports.initGame = function (state, playerCount) {
   state.drawn = null;
   state.hasDrawn = false;
   // dealer draws first tile
-  beginTurn(state, 0);
+  beginTurn(state, dealer);
 };
 
 // Draw a tile for `player` and set them as current. Handles wall exhaustion.
@@ -137,6 +140,7 @@ function beginTurn(state, player) {
   state.currentPlayer = player;
   state.hasDrawn = true;
   state.drawn = tile.id;
+  state._gangShangHua = false; // 普通摸牌不算杠上花
   state.phase = 'play';
 }
 
@@ -152,7 +156,7 @@ exports.handleMove = function (data, state, playerIndex) {
     if (d.type === 'win') {
       const info = core.huCheck(state.hands[playerIndex], state.melds[playerIndex], CANTONESE);
       if (!info.win) return 'mj_not_winning';
-      var scoreInfo = scoreHand(state.hands[playerIndex], state.melds[playerIndex], info, true, state.wall.length, state);
+      var scoreInfo = scoreHand(state.hands[playerIndex], state.melds[playerIndex], info, true, state.wall.length, state, state._gangShangHua);
       // 起胡番数检查
       if (state._minFan && state._minFan > 0 && scoreInfo.fan < state._minFan) return 'mj_not_enough_fan';
       state.winner = playerIndex;
@@ -171,6 +175,61 @@ exports.handleMove = function (data, state, playerIndex) {
         state.winInfo.buyFan = 0;
       }
       state.phase = 'over';
+      return null;
+    }
+
+    // 暗杠：自己回合手中有 4 张相同牌，杠出并补牌
+    if (d.type === 'selfkong') {
+      const suit = d.suit, num = d.num;
+      const hand = state.hands[playerIndex];
+      let removed = 0;
+      for (let i = hand.length - 1; i >= 0 && removed < 4; i--) {
+        if (hand[i].k === suit && hand[i].n === num) { hand.splice(i, 1); removed++; }
+      }
+      if (removed < 4) return 'mj_cannot_kong';
+      state.melds[playerIndex].push({ type: 'kong', tile: { k: suit, n: num }, tiles: [], from: playerIndex });
+      if (state.wall.length > 0) {
+        const rep = state.wall.pop();
+        state.hands[playerIndex].push(rep);
+        sortHand(state.hands[playerIndex]);
+        state.drawn = rep.id;
+      }
+      state.hasDrawn = true;
+      state._gangShangHua = true; // 杠后补牌，若胡牌则算杠上花
+      state.phase = 'play';
+      state.lastDiscard = null;
+      return null;
+    }
+
+    // 补杠（加杠）：已碰的刻子，摸到第 4 张时升级成杠并补牌
+    if (d.type === 'addkong') {
+      const suit = d.suit, num = d.num;
+      const hand = state.hands[playerIndex];
+      const melds = state.melds[playerIndex];
+      // 找到对应的碰（pung）副露
+      const mi = melds.findIndex(m => {
+        if (m.type !== 'pung') return false;
+        if (m.tile) return m.tile.k === suit && m.tile.n === num;
+        return m.tiles && m.tiles[0] && m.tiles[0].k === suit && m.tiles[0].n === num;
+      });
+      if (mi < 0) return 'mj_cannot_kong';
+      // 手中必须有第 4 张
+      const ti = hand.findIndex(t => t.k === suit && t.n === num);
+      if (ti < 0) return 'mj_cannot_kong';
+      const meld = melds[mi];
+      meld.type = 'kong';
+      meld.tiles.push(hand.splice(ti, 1)[0]);
+      // 补牌（杠后若胡算杠上花）
+      if (state.wall.length > 0) {
+        const rep = state.wall.pop();
+        state.hands[playerIndex].push(rep);
+        sortHand(state.hands[playerIndex]);
+        state.drawn = rep.id;
+      }
+      state.hasDrawn = true;
+      state._gangShangHua = true;
+      state.phase = 'play';
+      state.lastDiscard = null;
       return null;
     }
 
@@ -215,6 +274,9 @@ exports.handleMove = function (data, state, playerIndex) {
     if (d.type === 'pass') {
       claim.responses[playerIndex] = { type: 'pass' };
     } else if (d.type === 'chow') {
+      // 广东只能吃上家（弃牌者逆时针下一家）。eligibleClaims 只对上游 offer，
+      // 但 claim 响应入口必须再校验一次，防止非上游玩家非法吃牌。
+      if (playerIndex !== nextPlayer(state, claim.discarder)) return 'mj_cannot_chow';
       const pairs = findChowPairs(state.hands[playerIndex], tile);
       if (!pairs.length) return 'mj_cannot_chow';
       // pick the pair matching requested tile ids, else first
@@ -263,6 +325,22 @@ function resolveClaims(state) {
     }
   }
 
+  // A win below _minFan cannot stand. Demote it to a pass and re-resolve the
+  // remaining responses so the round always continues. Resolving *before* we null
+  // claim (and returning an error) kept the room in phase 'claim' with claim=null
+  // and winner unset, which made the caller dereference a null claim and crash.
+  if (best && best.type === 'win' && state._minFan && state._minFan > 0) {
+    const p = best.player;
+    const test = state.hands[p].slice();
+    test.push(tile);
+    const info = core.huCheck(test, state.melds[p], CANTONESE);
+    var scoreInfo = scoreHand(test, state.melds[p], info, false, state.wall.length, state);
+    if (scoreInfo.fan < state._minFan) {
+      claim.responses[p] = { type: 'pass' };
+      return resolveClaims(state);
+    }
+  }
+
   state.claim = null;
 
   if (!best) {
@@ -278,8 +356,7 @@ function resolveClaims(state) {
     test.push(tile);
     const info = core.huCheck(test, state.melds[p], CANTONESE);
     var scoreInfo = scoreHand(test, state.melds[p], info, false, state.wall.length, state);
-    // 起胡番数检查
-    if (state._minFan && state._minFan > 0 && scoreInfo.fan < state._minFan) return 'mj_not_enough_fan';
+    // 起胡番数已在上方 demote 检查中保证 >= _minFan（不满足的 win 已被降级为 pass）
     state.winner = p;
     state.winInfo = { type: info.type, from: claim.discarder, fan: scoreInfo.fan, details: scoreInfo.details };
     // 买码：胡牌后从牌尾买牌加分
@@ -349,8 +426,10 @@ function resolveClaims(state) {
     state.hands[p].push(rep);
     sortHand(state.hands[p]);
     state.drawn = rep.id;
+    state._gangShangHua = true; // 杠后补牌，若胡牌则算杠上花
   } else {
     state.drawn = null;
+    state._gangShangHua = false;
   }
   state.hasDrawn = true;
   state.phase = 'play';
@@ -360,7 +439,7 @@ function resolveClaims(state) {
 //  - core honours-mode returns 清一色 = 4, but rules (and tutorial) = 8
 //  - 平胡 = 1 is the base for a plain hand; 自摸 = +1 always stacks on top
 //  - minimum winning hand = 1 fan
-function scoreHand(hand, melds, winInfo, selfDraw, wallCount, state) {
+function scoreHand(hand, melds, winInfo, selfDraw, wallCount, state, gangShangHua) {
   // Compute pattern fans WITHOUT self-draw (handled separately below).
   var result = core.countFanDetailed(hand, melds, winInfo, CANTONESE, {
     selfDraw: false,
@@ -372,8 +451,13 @@ function scoreHand(hand, melds, winInfo, selfDraw, wallCount, state) {
   }
   // Base: a plain hand with no pattern fans is 平胡 = 1
   if (result.fan === 0) { result.details.push({ name: '平胡', fan: 1 }); result.fan = 1; }
-  // 自摸 always stacks as +1 on top of the base/pattern fans
-  if (selfDraw) { result.details.push({ name: '自摸', fan: 1 }); result.fan += 1; }
+  // 自摸 always stacks as +1; plus 海底捞月 if the winning tile is the last one.
+  if (selfDraw) {
+    if ((wallCount || 0) === 0) { result.details.push({ name: '海底捞', fan: 1 }); result.fan += 1; }
+    result.details.push({ name: '自摸', fan: 1 }); result.fan += 1;
+  }
+  // 杠上花：杠后补牌胡牌
+  if (gangShangHua) { result.details.push({ name: '杠上花', fan: 1 }); result.fan += 1; }
   // 封顶
   if (state && state._maxFan && state._maxFan > 0 && result.fan > state._maxFan) {
     result.fan = state._maxFan;
@@ -428,9 +512,13 @@ exports.playerView = function (state, playerIndex) {
     melds: state.melds.map(m => m.map(md => ({
       type: md.type, from: md.from, tiles: md.tiles.map(t => ({ k: t.k, n: t.n, id: t.id })),
     }))),
-    discards: state.discards.map(d => d.map(t => ({ k: t.k, n: t.n, id: t.id }))),
+    // _discardSeq 必须一起下发：渲染器靠它把四家的弃牌还原成全局出牌顺序，
+    // 丢掉就会退化成按玩家分组堆叠（排序全为 0，sort 成了空操作）
+    discards: state.discards.map(d => d.map(t => ({ k: t.k, n: t.n, id: t.id, _discardSeq: t._discardSeq }))),
     wall: state.wall.length, // hide actual wall tiles
-    lastDiscard: state.lastDiscard ? { tile: { k: state.lastDiscard.tile.k, n: state.lastDiscard.tile.n, id: state.lastDiscard.tile.id }, player: state.lastDiscard.player } : null,
+    // 统一为扁平 tile 结构（与四川一致）：渲染器按 ld.k/ld.n/ld.id 读取，
+    // 广东的 state.lastDiscard 是 { tile, player }，这里展开成扁平 + player 附加字段
+    lastDiscard: state.lastDiscard ? { k: state.lastDiscard.tile.k, n: state.lastDiscard.tile.n, id: state.lastDiscard.tile.id, player: state.lastDiscard.player } : null,
     claim: state.claim ? {
       tile: { k: state.claim.tile.k, n: state.claim.tile.n, id: state.claim.tile.id },
       discarder: state.claim.discarder,

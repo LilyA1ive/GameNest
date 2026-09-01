@@ -507,12 +507,22 @@ function clearAllRoomTimers(room) {
   }
 }
 
-// Mahjong: resolve a winner index to a fan total. Sichuan exports calculateScore;
-// Cantonese stores the resolved fan on state.winInfo but has no calculateScore export.
-function calculateMahjongScore(state, winnerIndex) {
-  var gameMod = gameRegistry[state.game];
+// Mahjong: resolve a winner index to a fan total. Cantonese stores the resolved fan
+// (incl. buy-tile bonus) on state.winInfo; Sichuan computes it via calculateScore.
+function calculateMahjongScore(state, winnerIndex, gameMod) {
+  // 粤麻（含走川麻入口的 cantonese 变体）：直接用 handleMove 里算好的 winInfo.fan。
+  // 四川规则会访问 state.deck，而粤麻 state 只有 wall，绝不能用四川的 calculateScore。
+  if (state._variants === 'cantonese') {
+    if (state.winInfo && typeof state.winInfo.fan === 'number') {
+      return { fan: state.winInfo.fan, details: [{ name: state.winInfo.type || '胡', fan: state.winInfo.fan }] };
+    }
+    return { fan: 1, details: [{ name: '平胡', fan: 1 }] };
+  }
+  // 四川：优先用游戏模块的 calculateScore
   if (gameMod && gameMod.calculateScore) {
-    return gameMod.calculateScore(state, winnerIndex);
+    try { return gameMod.calculateScore(state, winnerIndex); } catch (e) {
+      console.error('[mahjong] calculateScore error:', e.message);
+    }
   }
   if (state.winInfo && typeof state.winInfo.fan === 'number') {
     return { fan: state.winInfo.fan, details: [{ name: state.winInfo.type || '胡', fan: state.winInfo.fan }] };
@@ -544,16 +554,30 @@ function endOfRound(room) {
     winners.push(state.winner);
   }
 
-  // Simplified scoring: each winner gains their fan total. No cross-player deduction
-  // for now (TODO if head-to-head payment is desired later).
+  // Each winner gains fan points; losers split the loss equally (standard head-to-head).
+  // For 血战 (Sichuan multi-winner), total pot is sum of all winners' gains.
+  var totalPot = 0;
   for (var w = 0; w < winners.length; w++) {
-    var scoreInfo = calculateMahjongScore(state, winners[w]);
+    var scoreInfo = calculateMahjongScore(state, winners[w], gameMod);
     roundScores[winners[w]] = (roundScores[winners[w]] || 0) + scoreInfo.fan;
+    totalPot += scoreInfo.fan;
+  }
+  // Deduct equally from non-winning, non-drawn players.
+  // 取整到整数分，避免出现 -0.666666...这类小数（麻将积分都是整数）。
+  var losers = playerCount - winners.length;
+  if (losers > 0 && totalPot > 0) {
+    var perLose = Math.max(1, Math.round(totalPot / losers));
+    for (var p = 0; p < playerCount; p++) {
+      if (roundScores[p] === 0 && winners.indexOf(p) < 0) {
+        roundScores[p] = -perLose;
+      }
+    }
   }
 
   // 流局查花猪/查大叫罚分
+  var penaltyResult = null;
   if (gameMod.calculatePenalties) {
-    var penaltyResult = gameMod.calculatePenalties(state);
+    penaltyResult = gameMod.calculatePenalties(state);
     for (var p = 0; p < playerCount; p++) {
       if (penaltyResult.penalties[p]) {
         state._penalties[p] = (state._penalties[p] || 0) + penaltyResult.penalties[p];
@@ -564,13 +588,15 @@ function endOfRound(room) {
   if (!state.cumulativeScore) state.cumulativeScore = new Array(playerCount).fill(0);
   for (var i = 0; i < playerCount; i++) {
     state.cumulativeScore[i] = (state.cumulativeScore[i] || 0) + roundScores[i];
-    // 刮风下雨：杠收入累加到累计分
+    // 刮风下雨：杠收入累加到累计分 + 本局变动
     if (state._rain && state._gangScore && state._gangScore[i]) {
       state.cumulativeScore[i] += state._gangScore[i];
+      roundScores[i] += state._gangScore[i];
     }
-    // 流局罚分累加
+    // 流局罚分累加 + 本局变动
     if (state._penalties && state._penalties[i]) {
       state.cumulativeScore[i] += state._penalties[i];
+      roundScores[i] += state._penalties[i];
     }
   }
 
@@ -735,12 +761,14 @@ function scheduleRealtimeGame(room) {
 function scheduleBotMove(room) {
   if (!room || !room.state) return;
   const state = room.state;
-  if (state.winner !== null && state.winner !== undefined) return;
-  // Mahjong: Sichuan uses phase 'over' with winner still null — stop bots and settle
+  // Mahjong: settle when round is over. Must run BEFORE the winner check below —
+  // Cantonese sets state.winner to an index on 胡, so `winner !== null` would
+  // return early and skip endOfRound (bot wins would never add points).
   if ((room.game === 'mahjong-sichuan' || room.game === 'mahjong-cantonese') && state.phase === 'over') {
     endOfRound(room);
     return;
   }
+  if (state.winner !== null && state.winner !== undefined) return;
 
   const gameMod = gameRegistry[room.game];
   if (!gameMod) return;
@@ -765,7 +793,10 @@ function scheduleBotMove(room) {
   const bot = room.bots.get(cp);
   if (!bot) return;
 
-  const delay = 800 + Math.random() * 1200;
+  // 打牌/摸牌：快一些（0.8~2s）。吃碰杠等 claim 响应：放慢到 1.6~3s，
+  // 给真人玩家留出反应时间，避免"按不过 bot"。
+  const isClaimResp = state.phase === 'claim';
+  const delay = isClaimResp ? (1600 + Math.random() * 1400) : (800 + Math.random() * 1200);
   clearTimeout(room._botTimer);
   room._botTimer = setTimeout(() => {
     if (!rooms.has(room._roomId)) return;
@@ -779,6 +810,8 @@ function scheduleBotMove(room) {
         if (fb) gameMod.handleMove({}, room.state, cp); // last resort: empty move (most games draw + advance)
       }
       skipDisconnectedTurn(room);
+      // 麻将：bot 胡牌也先结算再广播，客户端才不会先看到 0 分再被 round_end 修正
+      checkMahjongRoundEnd(room);
       broadcastGameView(room);
       scheduleBotMove(room);
     } catch(e) {
@@ -1318,11 +1351,12 @@ wss.on('connection', (ws) => {
       const isStageLiveAction = currentRoom.game === 'drawguess' && (data.type === 'stage_stroke' || data.type === 'stage_guess');
       if (currentRoom.game === 'drawguess' && !isStageLiveAction) scheduleDrawguessTimer(currentRoom);
 
+      // Mahjong: settle the round before broadcasting the 'over' game_state so the
+      // settlement panel draws with the already-updated cumulativeScore (no stale flash).
+      checkMahjongRoundEnd(currentRoom);
       broadcastGameView(currentRoom, 'game_state');
       if (currentRoom.game === 'doudizhu') scheduleTurnTimer(currentRoom);
       scheduleBotMove(currentRoom);
-      // Mahjong: settle the round once it reaches phase 'over'
-      checkMahjongRoundEnd(currentRoom);
       return;
     }
 
@@ -1368,11 +1402,9 @@ wss.on('connection', (ws) => {
 
       currentRoom.state = gameMod.createState();
       applyRuntimeState(currentRoom, totalPlayers);
-      if (gameMod && gameMod.initGame) {
-        gameMod.initGame(currentRoom.state, totalPlayers);
-      }
 
-      // Mahjong multi-round: restore cumulative scores and rotate the dealer.
+      // 麻将多局：庄家/累计分必须在 initGame 之前写回，
+      // 因为 initGame 要按 dealerIndex 发牌决定谁先摸（写在后面就永远是 0 号先手）。
       if (prevMJ) {
         currentRoom.state.cumulativeScore = prevMJ.cumulativeScore || new Array(totalPlayers).fill(0);
         var nextDealer;
@@ -1389,6 +1421,10 @@ wss.on('connection', (ws) => {
         }
         currentRoom.state.dealerIndex = nextDealer;
         currentRoom.state.roundNumber = (prevMJ.roundNumber || 1) + 1;
+      }
+
+      if (gameMod && gameMod.initGame) {
+        gameMod.initGame(currentRoom.state, totalPlayers);
       }
 
       if (currentRoom.game === 'drawguess') scheduleDrawguessTimer(currentRoom);

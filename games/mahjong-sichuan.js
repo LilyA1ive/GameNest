@@ -63,6 +63,11 @@ exports.initGame = function (state, playerCount) {
   state._lastFourAutoWin = opt.mj_lastFourAutoWin === true;
   state._swapThree = opt.mj_swapThree === true;
 
+  // Server writes the next dealer into state.dealerIndex before initGame. Use it
+  // for the extra tile and the starting player; fall back to 0 so the first
+  // round and any path that does not set it stays unchanged.
+  const dealer = state.dealerIndex || 0;
+
   const deck = buildDeck(SICHUAN);
   state.deck = deck;
   state.hands = [];
@@ -79,7 +84,7 @@ exports.initGame = function (state, playerCount) {
   state._winSelfDraw = {};
   state._gangScore = new Array(playerCount).fill(0);
   state._penalties = new Array(playerCount).fill(0);
-  state.currentPlayer = 0;
+  state.currentPlayer = dealer;
 
   const hands = [];
   for (let i = 0; i < playerCount; i++) hands.push([]);
@@ -90,7 +95,7 @@ exports.initGame = function (state, playerCount) {
     }
   }
   // Dealer gets the 14th tile
-  hands[0].push(deck.pop());
+  hands[dealer].push(deck.pop());
 
   for (let i = 0; i < playerCount; i++) {
     sortTiles(hands[i]);
@@ -173,10 +178,10 @@ function executeSwap(state, playerCount) {
   state._swapSelections = [];
 }
 
-// After void chosen by all: dealer (0) begins play, already holding 14.
+// After void chosen by all: dealer begins play, already holding 14.
 function startPlayAfterVoid(state) {
   state.phase = 'play';
-  state.currentPlayer = 0;
+  state.currentPlayer = state.dealerIndex || 0;
   state.drawn = null;
 }
 
@@ -479,6 +484,42 @@ exports.handleMove = function (data, state, playerIndex) {
         }
       }
       // 摸补牌
+      if (state.deck.length > 0) {
+        const rep = state.deck.pop();
+        state.hands[playerIndex].push(rep);
+        sortTiles(state.hands[playerIndex]);
+        state.drawn = rep.id;
+      }
+      state.phase = 'play';
+      state.lastDiscard = null;
+      return null;
+    }
+
+    // 补杠（加杠）：已碰的刻子，摸到第 4 张时升级成杠并补牌
+    if (data.type === 'addkong') {
+      const suit = data.suit, num = data.num;
+      const hand = state.hands[playerIndex];
+      const melds = state.melds[playerIndex];
+      const mi = melds.findIndex(m => {
+        if (m.type !== 'pung') return false;
+        if (m.tile) return m.tile.k === suit && m.tile.n === num;
+        return m.tiles && m.tiles[0] && m.tiles[0].k === suit && m.tiles[0].n === num;
+      });
+      if (mi < 0) return 'mj_cannot_kong';
+      const ti = hand.findIndex(t => t.k === suit && t.n === num);
+      if (ti < 0) return 'mj_cannot_kong';
+      const meld = melds[mi];
+      meld.type = 'kong';
+      meld.tiles.push(hand.splice(ti, 1)[0]);
+      // 刮风下雨：补杠（加杠）收所有未胡者 1 分
+      if (state._rain) {
+        for (let p = 0; p < state.hands.length; p++) {
+          if (p !== playerIndex && !state.winners.includes(p)) {
+            state._gangScore[playerIndex] = (state._gangScore[playerIndex] || 0) + 1;
+            state._gangScore[p] = (state._gangScore[p] || 0) - 1;
+          }
+        }
+      }
       if (state.deck.length > 0) {
         const rep = state.deck.pop();
         state.hands[playerIndex].push(rep);

@@ -141,6 +141,7 @@
       ]
     },
     'mahjong-sichuan': {
+      title: '四川麻将',
       sections: [
         { h: '游戏目标', p: '凑出胡牌牌型（4组面子+1对将），成为胡牌的玩家。四川麻将采用"血战到底"规则——一家胡了不结束，继续打到3家胡或流局。' },
         { h: '定缺（门清）', p: '开局必须选一门花色（万/筒/条）作为"缺门"。胡牌时手里绝对不能有缺门花色！建议选手里最少的那门。流局时手里还有三门花色（称为"花猪"）要包赔所有玩家。' },
@@ -160,6 +161,7 @@
       ]
     },
     'mahjong-cantonese': {
+      title: '广东麻将',
       sections: [
         { h: '游戏目标', p: '广东鸡平胡——最快凑出胡牌牌型即可胡牌，一家胡即结束本局。节奏快，适合休闲。' },
         { h: '可以吃牌', p: '与四川不同，广东麻将可以吃牌！上家打出的牌，你能组成顺子就可以吃。吃后必须立即出牌。吃牌只能吃上家（逆时针方向的上家）。' },
@@ -467,6 +469,7 @@
       ]
     },
     'mahjong-sichuan': {
+      title: 'Sichuan Mahjong',
       sections: [
         { h: 'Objective', p: 'Form a winning hand (4 melds + 1 pair) to win. Sichuan "Blood Battle" — after one player wins, others keep playing until 3 win or the wall is empty.' },
         { h: 'Void Suit', p: 'At game start, pick one suit (万/筒/条) as your "void" suit. Your winning hand must have ZERO tiles of that suit! Choose the suit with fewest tiles. If you still have all 3 suits at draw ("花猪"), you pay everyone.' },
@@ -485,6 +488,7 @@
       ]
     },
     'mahjong-cantonese': {
+      title: 'Cantonese Mahjong',
       sections: [
         { h: 'Objective', p: 'Cantonese (鸡平胡) — fastest to complete a winning hand wins. One win ends the round. Quick and casual.' },
         { h: 'You Can Chow!', p: 'Unlike Sichuan, Cantonese mahjong allows chowing! If the player before you (upstream) discards a tile you can form a sequence with, you can chow. Must discard immediately after.' },
@@ -676,9 +680,13 @@
     }
 
     var catalogEntry = window.gameCatalog && window.gameCatalog.byId(gameType);
-    var title = catalogEntry ? catalogEntry.name : gameType;
+    // 变体（如 mahjong-cantonese）在大厅目录里没有条目，byId 会返回 null，
+    // 此时用教程自带的 title，否则会把原始 key 显示出来。
+    var title = t.title || (catalogEntry ? catalogEntry.name : gameType);
 
-    var html = '<div style="background:var(--surface);border-radius:var(--radius);padding:24px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto;">';
+    var html = '<div style="background:var(--surface);border-radius:var(--radius);padding:24px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto;position:relative;">';
+    // 右上角 ✕ 关闭（不依赖滚到底部）
+    html += '<div onclick="document.getElementById(\'tutorialOverlay\').style.display=\'none\'" style="position:absolute;top:10px;right:12px;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;line-height:1;color:var(--text-muted);background:var(--surface);box-shadow:0 1px 4px rgba(0,0,0,.2);">✕</div>';
     html += '<div style="font-size:24px;font-weight:700;margin-bottom:4px;">📖 ' + _tf('tutorial_title', title) + '</div>';
     html += '<div style="width:36px;height:2px;background:var(--accent);margin-bottom:16px;"></div>';
 

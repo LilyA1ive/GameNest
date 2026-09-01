@@ -15,6 +15,7 @@
 
 
   let ws, state, players, currentRenderer;
+  let currentRendererKey = null;  // 麻将四川/广东切换时据此重新 init
   let roomPhase = 'lobby';   // 'lobby' | 'ready' | 'playing'
   let isHost = false;
   let myReady = false;
@@ -233,6 +234,7 @@
           wasRestart = true;
           if (typeof unregisterAllActions === 'function') unregisterAllActions();
           currentRenderer = null;
+          currentRendererKey = null;
           const container = el.boardArea;
           if (container) container.innerHTML = '';
           // Host started a new game: non-hosts drop their result overlay.
@@ -240,7 +242,13 @@
             window._updateOverlayForNewGame();
           }
         }
+        // round_end 设的 roundScores 会被 game_state 的整体替换覆盖；
+        // phase 仍是 over 时把它保留下来，供结算面板显示本局加减分
+        var prevRoundScores = state && state.roundScores;
         state = msg.state || state;
+        if (state && !state.roundScores && prevRoundScores && state.phase === 'over') {
+          state.roundScores = prevRoundScores;
+        }
         players = msg.players || players;
         window._players = players;
         roomPhase = 'playing';
@@ -273,6 +281,7 @@
           state.dealerIndex = msg.dealerIndex;
           state.roundNumber = msg.roundNumber;
           state.winners = msg.winners;
+          state.roundScores = msg.roundScores;
         }
         renderGame();
       },
@@ -836,13 +845,17 @@
       } else if (game === 'mahjong-sichuan') {
         optionsEl.style.display = 'block';
         var mjMode = roomOptions.mahjongMode || 'sichuan';
-        // Helper: build a toggle checkbox line
+        // Helper: build a toggle checkbox line + optional muted description
         function mjToggle(key, labelKey) {
           var checked = roomOptions[key] === true || roomOptions[key] === 'true';
+          var desc = _t(labelKey + '_desc');
+          var descHtml = (desc && desc !== labelKey + '_desc')
+            ? '<div style="font-size:12px;color:var(--text-muted);margin:-2px 0 6px 24px;line-height:1.4;">' + desc + '</div>'
+            : '';
           return '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:6px;">' +
             '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="window._setGameOption(\'' + key + '\', this.checked)" style="width:16px;height:16px;cursor:pointer;">' +
             _t(labelKey) +
-            '</label>';
+            '</label>' + descHtml;
         }
         if (isHost) {
           optionsEl.innerHTML =
@@ -868,29 +881,30 @@
               '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:6px;">' +
                 _t('mj_rule_maxFan') + ': ' +
                 '<select onchange="window._setGameOption(\'mj_maxFan\', parseInt(this.value))" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:13px;">' +
-                  '<option value="0"' + (roomOptions.mj_maxFan === 0 || !roomOptions.mj_maxFan ? ' selected' : '') + '>无上限</option>' +
-                  '<option value="3"' + (roomOptions.mj_maxFan === 3 ? ' selected' : '') + '>3番</option>' +
-                  '<option value="4"' + (roomOptions.mj_maxFan === 4 ? ' selected' : '') + '>4番</option>' +
-                  '<option value="5"' + (roomOptions.mj_maxFan === 5 ? ' selected' : '') + '>5番</option>' +
+                  '<option value="0"' + (roomOptions.mj_maxFan === 0 || !roomOptions.mj_maxFan ? ' selected' : '') + '>' + _t('mj_fan_nolimit') + '</option>' +
+                  '<option value="3"' + (roomOptions.mj_maxFan === 3 ? ' selected' : '') + '>' + tf('mj_fan_n', 3) + '</option>' +
+                  '<option value="4"' + (roomOptions.mj_maxFan === 4 ? ' selected' : '') + '>' + tf('mj_fan_n', 4) + '</option>' +
+                  '<option value="5"' + (roomOptions.mj_maxFan === 5 ? ' selected' : '') + '>' + tf('mj_fan_n', 5) + '</option>' +
                 '</select>' +
               '</label>' +
               '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-bottom:6px;">' +
                 _t('mj_rule_minFan') + ': ' +
                 '<select onchange="window._setGameOption(\'mj_minFan\', parseInt(this.value))" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:13px;">' +
-                  '<option value="0"' + (roomOptions.mj_minFan === 0 || !roomOptions.mj_minFan ? ' selected' : '') + '>鸡胡(0番)</option>' +
-                  '<option value="1"' + (roomOptions.mj_minFan === 1 ? ' selected' : '') + '>1番</option>' +
-                  '<option value="3"' + (roomOptions.mj_minFan === 3 ? ' selected' : '') + '>3番</option>' +
+                  '<option value="0"' + (roomOptions.mj_minFan === 0 || !roomOptions.mj_minFan ? ' selected' : '') + '>' + _t('mj_fan_chicken') + '</option>' +
+                  '<option value="1"' + (roomOptions.mj_minFan === 1 ? ' selected' : '') + '>' + tf('mj_fan_n', 1) + '</option>' +
+                  '<option value="3"' + (roomOptions.mj_minFan === 3 ? ' selected' : '') + '>' + tf('mj_fan_n', 3) + '</option>' +
                 '</select>' +
               '</label>' +
             '</div>' : '');
         } else {
           var onOff = function(k) { return (roomOptions[k] === true || roomOptions[k] === 'true') ? '✓' : '—'; };
-          var maxFanLabel = function(v) { return v ? v + '番' : '无上限'; };
+          var maxFanLabel = function(v) { return v ? tf('mj_fan_n', v) : _t('mj_fan_nolimit'); };
           optionsEl.innerHTML =
             '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">' + _t('game_settings') + '</div>' +
             '<div style="font-size:13px;color:var(--text-muted)">' + _t('mahjong_mode') + ': ' +
               (mjMode === 'cantonese' ? _t('mahjong_mode_cantonese') : _t('mahjong_mode_sichuan')) + '</div>' +
             (mjMode === 'sichuan' ? '<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.8;">' +
+              '<div style="font-weight:600;margin-bottom:2px;">' + _t('mj_rules_title') + '</div>' +
               _t('mj_rule_bloodBattle') + ': ' + onOff('mj_bloodBattle') + '<br>' +
               _t('mj_rule_multiWinner') + ': ' + onOff('mj_multiWinner') + '<br>' +
               _t('mj_rule_rain') + ': ' + onOff('mj_rain') + '<br>' +
@@ -899,9 +913,10 @@
               _t('mj_rule_lastFourAutoWin') + ': ' + onOff('mj_lastFourAutoWin') + '<br>' +
               _t('mj_rule_swapThree') + ': ' + onOff('mj_swapThree') +
             '</div>' : mjMode === 'cantonese' ? '<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.8;">' +
+              '<div style="font-weight:600;margin-bottom:2px;">' + _t('mj_rules_cantonese') + '</div>' +
               _t('mj_rule_buyTiles') + ': ' + onOff('mj_buyTiles') + '<br>' +
               _t('mj_rule_maxFan') + ': ' + maxFanLabel(roomOptions.mj_maxFan) + '<br>' +
-              _t('mj_rule_minFan') + ': ' + (roomOptions.mj_minFan ? roomOptions.mj_minFan + '番' : '鸡胡(0番)') +
+              _t('mj_rule_minFan') + ': ' + (roomOptions.mj_minFan ? tf('mj_fan_n', roomOptions.mj_minFan) : _t('mj_fan_chicken')) +
             '</div>' : '');
         }
       } else if (isHost && gameInfo.supportsAI && window._gamesWithDifficulty.indexOf(game) >= 0) {
@@ -1080,11 +1095,30 @@
   };
 
   // ---- Game Rendering ----
+  // 麻将只有一个大厅入口（mahjong-sichuan），四川/广东是房间内的模式。
+  // 渲染器必须跟着模式走，否则广东局会套用四川界面：出现不该有的定缺提示，
+  // 而买码翻牌动画（只存在于广东渲染器里）永远不会显示。
+  function rendererKeyFor(g) {
+    if (g !== 'mahjong-sichuan') return g;
+    // 兜底：_buyTiles 是广东 playerView 独有字段，房间选项还没同步到时也能判对
+    var isCantonese = roomOptions.mahjongMode === 'cantonese' ||
+      (state && state._buyTiles !== undefined);
+    return isCantonese ? 'mahjong-cantonese' : 'mahjong-sichuan';
+  }
+
+  // 「查看规则」按钮也要按模式取教程：sessionStorage 里存的是大厅入口 id，
+  // 直接用它会让广东局弹出四川教程（开头就是定缺）。
+  window._effectiveGameKey = function() {
+    return rendererKeyFor(game);
+  };
+
   function renderGame() {
     if (!state) return;
-    if (!currentRenderer) {
+    var key = rendererKeyFor(game);
+    if (!currentRenderer || currentRendererKey !== key) {
       if (typeof unregisterAllActions === 'function') unregisterAllActions();
-      currentRenderer = window.gameRenderers.get(game);
+      currentRenderer = window.gameRenderers.get(key);
+      currentRendererKey = key;
       el.boardArea.innerHTML = '';
       if (currentRenderer && currentRenderer.init) currentRenderer.init(el.boardArea);
     }
@@ -1180,6 +1214,22 @@
       showToast(_t('restart_wait_host'));
       send('request_restart', {});
       // Reset the flag after 10s so they can re-request.
+      setTimeout(function() { pendingRestart = false; }, 10000);
+    }
+  };
+
+  // 麻将结算界面的「下一局」：多局制的正常推进，不该弹"确定要重新开始"的警告框。
+  // 非房主仍走请求房主的路径。
+  window.doNextRound = function() {
+    if (isHost) {
+      el.overlay.style.display = 'none';
+      if (typeof window._beforeGameRestart === 'function') window._beforeGameRestart();
+      send('game_restart');
+    } else {
+      if (pendingRestart) return;
+      pendingRestart = true;
+      showToast(_t('restart_wait_host'));
+      send('request_restart', {});
       setTimeout(function() { pendingRestart = false; }, 10000);
     }
   };

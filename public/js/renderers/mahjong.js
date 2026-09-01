@@ -26,8 +26,11 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
   var _animTimer = null;     // 动画循环句柄
   var _claimEffects = [];    // 碰杠吃胡动画效果 [{ pos, type, text, birth }]
   var _shownWinners = new Set(); // 已触发过胡牌动画的玩家（避免血战到底反复弹出）
+  var _swapSelected = [];         // 换三张：当前玩家已选中的牌 id
+  var _prevPhase = null;          // 上一帧 phase（用于检测进入 swap 阶段时清空选择）
   var _prevMeldCounts = []; // 每家上一帧的明牌数（检测新增）
   var _turnPulse = 0;        // 当前玩家指示脉冲
+  var _prevHandSize = 0;     // 上一帧自己手牌数（手机端动态调 canvas 高度）
 
   // 是否广东（带番子）：四川 playerView 总带 cfg，广东不带
   function isCantonese() { return _state && _state.cfg === undefined; }
@@ -39,7 +42,8 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
   }
 
   var STYLES = '' +
-    '.mj-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;height:100%;flex:1;min-height:0;}' +
+    '.mj-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;height:100%;flex:1;min-height:0;overflow:hidden;}' +
+    '.mj-board-mobile{overflow-y:auto;-webkit-overflow-scrolling:touch;}' +
     '.mj-status{text-align:center;font-size:13px;font-weight:700;min-height:18px;color:var(--text-muted);letter-spacing:.3px;padding:0 8px;}' +
     '.mj-bar{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;min-height:50px;padding:4px 0;}' +
     '.mj-btn{border:0;border-radius:16px;padding:12px 22px;font-size:15px;font-weight:800;cursor:pointer;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.15);transition:transform .12s,box-shadow .12s;letter-spacing:1px;position:relative;}' +
@@ -56,7 +60,7 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
       '.mj-status{font-size:12px;}' +
     '}';
 
-  window.gameRenderers.set('mahjong-sichuan', {
+  var mahjongRenderer = {
     init: function(container) {
       try {
         // 注入样式（仅一次）
@@ -76,6 +80,11 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
           '</div>';
         canvas = document.getElementById('mjCanvas');
         ctx = canvas.getContext('2d');
+        // 手机端：允许 mjBoard 上下滚动（手牌多行时）
+        if (window.innerWidth < 500) {
+          var board = document.getElementById('mjBoard');
+          if (board) board.classList.add('mj-board-mobile');
+        }
         sizeCanvas();
         // 设置 canvas.width 会清空画布，必须紧接着重绘，否则旋转屏幕后白屏
         if (!_resizeBound) {
@@ -85,6 +94,13 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
         canvas.addEventListener('click', onClick);
         canvas.addEventListener('mousemove', onMouseMove);
         canvas.addEventListener('mouseleave', function() { _hoverIdx = -1; draw(); });
+        // 重置闭包状态：init 在跨局重启时会再次调用，必须清掉上一局残留
+        _prevPhase = null;
+        _swapSelected = [];
+        _shownWinners = new Set();
+        _claimEffects = [];
+        _lastDiscardId = null;
+        _drawPulse = 0;
       } catch (e) {
         console.error('[mahjong] init error:', e);
         // 兜底：至少显示一个提示
@@ -97,6 +113,17 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
         _state = state;
         _playerIndex = playerIndex;
         if (!ctx) return;
+        // 手机端：手牌数变化时重新计算 canvas 高度（支持多行滚动）
+        if (state && state.hands && state.hands[_playerIndex]) {
+          var curSize = state.hands[_playerIndex].length || 0;
+          if (curSize !== _prevHandSize && W < 500) {
+            _prevHandSize = curSize;
+            var oldH = H;
+            sizeCanvas();
+            if (H !== oldH) { draw(); return; }
+          }
+          _prevHandSize = curSize;
+        }
         // 新局开始（定缺阶段）→ 重置胡牌动画记录
         if (state && state.phase === 'void') _shownWinners.clear();
         // 检测新弃牌 → 触发落点脉冲
@@ -144,11 +171,23 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
         if (_claimEffects.length > 0 && !_animTimer) startAnimLoop();
         draw();
         drawControls();
+        // 换三张：进入 swap 阶段时清空选择（防止重启后残留上一轮的选择）；
+        // 离开 swap 阶段时也清空（服务端已推进到下一家或进入定缺）
+        if (state && _prevPhase !== 'swap' && state.phase === 'swap') {
+          _swapSelected = [];
+        } else if (state && state.phase !== 'swap' && _swapSelected && _swapSelected.length) {
+          _swapSelected = [];
+        }
+        if (state) _prevPhase = state.phase;
       } catch (e) {
         console.error('[mahjong] render error:', e);
       }
     },
-  });
+  };
+
+  // 四川/广东共用同一渲染器：通过 isCantonese()（state.cfg === undefined）区分
+  window.gameRenderers.set('mahjong-sichuan', mahjongRenderer);
+  window.gameRenderers.set('mahjong-cantonese', mahjongRenderer);
 
   // ---- 动画循环：弃牌脉冲 + 碰杠效果 + 新摸牌脉冲，空闲自动停 ----
   function startAnimLoop() {
@@ -205,13 +244,6 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     H = Math.min(H, 900);
     // DPR 适配：高分屏用更多物理像素渲染，画面更清晰
     DPR = Math.min(window.devicePixelRatio || 1, 3);
-    canvas.width = Math.round(W * DPR);
-    canvas.height = Math.round(H * DPR);
-    canvas.style.width = W + 'px';
-    canvas.style.height = H + 'px';
-    canvas.style.display = 'block';
-    canvas.style.margin = 'auto';
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     // 牌尺寸：手机用 W/8 更大易点；桌面 W/11；限制在合理范围
     if (isMobile) {
       TW = Math.max(36, Math.min(58, W / 8));
@@ -219,6 +251,32 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
       TW = Math.max(38, Math.min(64, W / 11));
     }
     TH = Math.round(TW * 1.4);
+    // 手机端：手牌多行时动态加高 canvas，允许 mjBoard 滚动
+    if (isMobile && _state && _state.hands && _state.hands[_playerIndex]) {
+      var handN = _state.hands[_playerIndex].length || 0;
+      var handRows = Math.max(1, Math.ceil(handN * (TW + 4) / (W - 20)));
+      if (handRows > 1) {
+        var neededH = H + (handRows - 1) * (TH + 12) + 20;
+        H = Math.min(neededH, 1600);
+      }
+    }
+    // 保留滚动位置（canvas 高度变化后 scrollTop 会失效）
+    var board = document.getElementById('mjBoard');
+    var oldScrollRatio = 0;
+    if (board && board.scrollHeight > board.clientHeight) {
+      oldScrollRatio = board.scrollTop / (board.scrollHeight - board.clientHeight || 1);
+    }
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    canvas.style.display = 'block';
+    canvas.style.margin = 'auto';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // 恢复滚动位置
+    if (board && board.scrollHeight > board.clientHeight) {
+      board.scrollTop = oldScrollRatio * (board.scrollHeight - board.clientHeight);
+    }
   }
 
   // ---- 牌面绘制 ----
@@ -402,24 +460,27 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     drawScorePanel();
   }
 
-  // 牌库余量显示
+  // 牌库余量显示：四川读 deck，广东读 wall（数字），显示在玩家右下角
   function drawWallCount() {
-    var count = _state.deckCount || (_state.deck && _state.deck.length) || 0;
+    var count = _state.deckCount || (_state.deck && _state.deck.length)
+      || (typeof _state.wall === 'number' ? _state.wall : 0) || 0;
     if (!count) return;
     ctx.save();
     ctx.fillStyle = 'rgba(255,255,255,.55)';
     ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     var rn = _state.roundNumber || 1;
-    ctx.fillText(t('mj_round_label', '第') + rn + t('mj_round_unit', '局') + ' · ' + t('mj_wall_left', '余牌: ') + count, W / 2, H / 2 + 85);
+    ctx.fillText(t('mj_round_label', '第') + rn + t('mj_round_unit', '局') + ' · ' + t('mj_wall_left', '余牌: ') + count, W - 12, H - 6);
     ctx.restore();
   }
 
   function drawOpponents() {
     var seats = _state.hands.length;
     // 对手牌背：对家横排在顶部；左右家打横、垂直向下延伸（2列多行网格）
-    var tw = Math.round(TW * 0.5), th = Math.round(TH * 0.5);
+    var _isMobile = W < 500;
+    var oppScale = _isMobile ? 0.38 : 0.5;
+    var tw = Math.round(TW * oppScale), th = Math.round(TH * oppScale);
     var gap = 2;
     var sideCols = 2; // 左右家每行摆 2 张（打横），然后向下延伸
     for (var s = 0; s < seats; s++) {
@@ -469,47 +530,77 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     if (!Array.isArray(hand) || hand.length === 0) return;
     var n = hand.length;
     var tw = TW, th = TH;
-    // 牌过大时横向压缩
     var maxW = W - 20;
-    if (n * (tw + 4) > maxW) tw = Math.floor((maxW - n * 4) / n);
-    var totalW = n * (tw + 4);
+    var _isMobile = W < 500;
+    // 多行布局（手机端手牌过多时换行，不压缩牌面大小）
+    var useMultiRow = _isMobile && n * (tw + 4) > maxW;
+    var rows = 1, perRow = n;
+    if (useMultiRow) {
+      perRow = Math.floor(maxW / (tw + 4));
+      if (perRow < 4) perRow = 4;
+      rows = Math.ceil(n / perRow);
+    } else if (n * (tw + 4) > maxW) {
+      tw = Math.floor((maxW - n * 4) / n); // 桌面端仍用压缩
+    }
+    var totalW = (useMultiRow ? perRow : n) * (tw + 4);
     var startX = (W - totalW) / 2;
-    var y = H - th - 14;
+    // 垂直居中多行手牌
+    var totalHandH = rows * (th + 6);
+    var y = H - totalHandH - 14;
     _layout = [];
     for (var i = 0; i < n; i++) {
-      var x = startX + i * (tw + 4);
+      var row = useMultiRow ? Math.floor(i / perRow) : 0;
+      var col = useMultiRow ? (i % perRow) : i;
+      var rowTiles = useMultiRow ? Math.min(perRow, n - row * perRow) : n;
+      var rowW = rowTiles * (tw + 4);
+      var rowStartX = (W - rowW) / 2;
+      var x = rowStartX + col * (tw + 4);
+      var tileY = y + row * (th + 6);
       var isDrawn = _state.drawn && hand[i].id === _state.drawn && _state.currentPlayer === _playerIndex && _state.phase === 'play';
+      var isSwapSel = _state.phase === 'swap' && _swapSelected && _swapSelected.indexOf(hand[i].id) >= 0;
       var hover = _hoverIdx === i;
-      var lift = hover ? -12 : (isDrawn ? -10 : 0);
-      // 新摸牌青蓝外发光（与黄色回合提示区分）
+      var lift = isSwapSel ? -14 : (hover ? -12 : (isDrawn ? -10 : 0));
+      // 换三张选中：金色粗边框 + 上浮
+      if (isSwapSel) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(200,164,92,.7)';
+        ctx.shadowBlur = 12;
+        ctx.strokeStyle = '#c8a45c';
+        ctx.lineWidth = 3;
+        roundRect(x - 3, tileY + lift - 3, tw + 6, th + 6, 8);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // 新摸牌青蓝外发光
       if (isDrawn && _drawPulse > 0.01) {
         ctx.save();
         ctx.shadowColor = 'rgba(6,182,212,' + (0.65 * _drawPulse) + ')';
         ctx.shadowBlur = 16 + 10 * _drawPulse;
         ctx.fillStyle = 'rgba(6,182,212,' + (0.10 * _drawPulse) + ')';
-        roundRect(x - 4, y + lift - 4, tw + 8, th + 8, 8);
+        roundRect(x - 4, tileY + lift - 4, tw + 8, th + 8, 8);
         ctx.fill();
         ctx.restore();
       }
       var hl = hover ? 1 : (isDrawn ? 2 : 0);
-      drawTileFace(x, y + lift, tw, th, hand[i], hl);
-      // 新摸角标“新”
+      drawTileFace(x, tileY + lift, tw, th, hand[i], hl);
+      // 新摸角标”新”
       if (isDrawn) {
         ctx.save();
         ctx.fillStyle = '#06b6d4';
         ctx.beginPath();
-        ctx.arc(x + tw - 9, y + lift + 9, 8, 0, Math.PI * 2);
+        ctx.arc(x + tw - 9, tileY + lift + 9, 8, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 9px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('新', x + tw - 9, y + lift + 9.5);
+        ctx.fillText(t('mj_new_tile', '新'), x + tw - 9, tileY + lift + 9.5);
         ctx.restore();
       }
-      _layout.push({ x: x, y: y + lift, w: tw, h: th, idx: i });
+      _layout.push({ x: x, y: tileY + lift, w: tw, h: th, idx: i });
     }
-    // 定缺花色（自己）：钉在手牌区左上角，缺什么就亮什么
+    // 定缺花色（自己）：钉在手牌区左上角，缺什么就亮什么（仅四川）
+    if (!isCantonese()) {
     var vs = _state.voidSuit && _state.voidSuit[_playerIndex];
     if (vs) {
       var vsLabel = vs === 'wan' ? '万' : vs === 'tong' ? '筒' : '条';
@@ -533,6 +624,7 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
       ctx.stroke();
       ctx.restore();
     }
+    } // end if (!isCantonese())
   }
 
   // 公共出牌区：中央一堆，按全局出牌时间顺序追加（每张新牌都在末尾，不插入中间，不按花色归类）
@@ -880,7 +972,55 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     if (!_state) return;
     var me = _playerIndex;
 
+    if (_state.phase === 'swap') {
+      // 换三张：轮流选 3 张同花色牌与对家交换
+      if (_state.currentPlayer !== me) {
+        status.textContent = t('mj_swap_wait', '已选定，等待其他玩家...');
+        return;
+      }
+      if (!_swapSelected) _swapSelected = [];
+      var hand = Array.isArray(_state.hands[me]) ? _state.hands[me] : [];
+      // 顶部提示
+      status.textContent = t('mj_swap_title', '换三张：选 3 张同花色牌') + ' (' + _swapSelected.length + '/3)';
+      // 已选牌直接展示为牌面按钮
+      for (var s = 0; s < _swapSelected.length; s++) {
+        var id = _swapSelected[s];
+        var idx = hand.findIndex(function(t) { return t.id === id; });
+        (function(tile, sid) {
+          var b = document.createElement('button');
+          b.className = 'mj-btn void-suit';
+          b.textContent = SUIT_GLYPH[tile.k] + tile.n;
+          b.style.minWidth = '48px';
+          b.onclick = function() {
+            _swapSelected.splice(_swapSelected.indexOf(sid), 1);
+            drawControls();
+          };
+          bar.appendChild(b);
+        })(hand[idx], id);
+      }
+      // 确认按钮：始终显示，未满 3 张时禁用
+      var confirm = document.createElement('button');
+      confirm.className = 'mj-btn win';
+      confirm.textContent = t('mj_swap_confirm', '确认换牌') + ' (' + _swapSelected.length + '/3)';
+      if (_swapSelected.length === 3) {
+        confirm.onclick = function() {
+          if (window.makeGameMove) window.makeGameMove({ type: 'swap', tileIds: _swapSelected.slice() });
+          _swapSelected = [];
+        };
+      } else {
+        confirm.style.opacity = '0.4';
+        confirm.disabled = true;
+      }
+      bar.appendChild(confirm);
+      return;
+    }
+
     if (_state.phase === 'void') {
+      // 广东没有定缺，直接跳过
+      if (isCantonese()) {
+        status.textContent = t('mj_swap_wait', '准备开始...');
+        return;
+      }
       status.textContent = t('mj_void_title', '定缺：选择一门花色，打完该门才能胡牌');
       var suits = [{ k: 'wan' }, { k: 'tong' }, { k: 'tiao' }];
       for (var i = 0; i < suits.length; i++) {
@@ -896,9 +1036,10 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     }
 
     if (_state.phase === 'claim' && _state.lastDiscard) {
-      // 自动判断可执行的操作，只显示能执行的按钮
+      // 只对当前 claim 响应者显示按钮（非响应者点按钮会被服务端拒绝）
+      var isActor = _state.claim && _state.claim.order && _state.claim.order[_state.claim.idx] === me;
       var claims = [];
-      if (me !== undefined && !(_state.winners || []).includes(me)) {
+      if (isActor && me !== undefined && !(_state.winners || []).includes(me)) {
         claims = getAvailableClaims();
       }
       if (claims.length > 0) {
@@ -922,8 +1063,27 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     }
 
     if (_state.phase === 'play' || _state.phase === 'win') {
-      // 不重复座位条已显示的信息；仅在不轮到自己时给一个等待提示
       status.textContent = _state.currentPlayer === me ? '' : t('mj_waiting', '等待其他玩家…');
+      // 自摸：轮到自己且手牌已形成胡牌型（含副露）→ 显示"胡"按钮
+      if (_state.currentPlayer === me) {
+        var selfHand = _state.hands[me];
+        // 自摸胡
+        if (Array.isArray(selfHand) && huCheckSimple(selfHand, _state.melds[me]) && voidSatisfied(selfHand)) {
+          bar.appendChild(btn(t('mj_win', '胡'), 'win', 'window._mjWin()'));
+        }
+        // 暗杠：手中有 4 张相同牌时可杠（四川 selfkong / 广东 selfkong）
+        if (Array.isArray(selfHand)) {
+          var quad = findQuadTile(selfHand);
+          if (quad) {
+            bar.appendChild(btn(t('mj_kong', '杠'), 'kong', "window._mjSelfKong('" + quad.k + "'," + quad.n + ")"));
+          }
+          // 补杠：有碰的刻子 + 摸到第 4 张
+          var addKongTile = findAddKongTile(selfHand, _state.melds[me]);
+          if (addKongTile) {
+            bar.appendChild(btn(t('mj_addkong', '补杠'), 'kong', "window._mjAddKong('" + addKongTile.k + "'," + addKongTile.n + ")"));
+          }
+        }
+      }
       return;
     }
     if (_state.phase === 'over') { status.textContent = t('mj_game_over', '本局结束'); return; }
@@ -941,6 +1101,35 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     var c = 0;
     for (var i = 0; i < hand.length; i++) if (hand[i].k === k && hand[i].n === n) c++;
     return c;
+  }
+
+  // 找手中有 4 张相同的牌（用于暗杠按钮）
+  function findQuadTile(hand) {
+    var counts = {};
+    for (var i = 0; i < hand.length; i++) {
+      var key = hand[i].k + ':' + hand[i].n;
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    for (var key in counts) {
+      if (counts[key] >= 4) {
+        var parts = key.split(':');
+        return { k: parts[0], n: parseInt(parts[1], 10) };
+      }
+    }
+    return null;
+  }
+
+  // 补杠：已有的碰（pung）副露 + 手中摸到第 4 张同牌
+  function findAddKongTile(hand, melds) {
+    if (!Array.isArray(melds)) return null;
+    for (var i = 0; i < melds.length; i++) {
+      var m = melds[i];
+      if (m.type !== 'pung') continue;
+      var r = m.tile || (m.tiles && m.tiles[0]);
+      if (!r) continue;
+      if (countMatching(hand, r.k, r.n) >= 1) return { k: r.k, n: r.n };
+    }
+    return null;
   }
 
   // 简化的胡牌判断（标准型 + 七对），与 games/lib/mahjong-core 一致
@@ -1032,8 +1221,13 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     if (mc >= 3) claims.push('kong');
     // 碰（手中有 2 张）
     if (mc >= 2) claims.push('pung');
-    // 吃（广东规则 + 能组成顺子）
-    if (canChow() && canChowTile(hand, ld)) claims.push('chow');
+    // 吃（广东：只能吃上家，且能组成顺子）
+    if (canChow()) {
+      var n = _state._playerCount || 4;
+      var discarder = _state.claim ? _state.claim.discarder : -1;
+      var isUpstream = discarder >= 0 && _playerIndex === (discarder + 1) % n;
+      if (isUpstream && canChowTile(hand, ld)) claims.push('chow');
+    }
     return claims;
   }
 
@@ -1067,15 +1261,19 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     var rect = canvas.getBoundingClientRect();
     var x = (e.clientX - rect.left) * (W / rect.width);
     var y = (e.clientY - rect.top) * (H / rect.height);
+    var me = _playerIndex;
     // 结算界面：本局结算面板内三按钮（下一局/返回房间/返回大厅）
     if (_state && _state.phase === 'over') {
+      var hasBuy = Array.isArray(_state.buyTiles) && _state.buyTiles.length > 0;
+      var playerCount = _state.hands.length;
       var panelW = Math.min(380, W - 40);
-      var panelH = 340;
+      var panelH = (playerCount > 0 ? 100 + playerCount * 36 : 340) + (hasBuy ? 60 : 0) + 100;
       var px = (W - panelW) / 2;
       var py = (H - panelH) / 2;
       // 下一局
       if (x >= W/2 - 60 && x <= W/2 + 60 && y >= py + panelH - 90 && y <= py + panelH - 54) {
-        if (window.doRestart) window.doRestart();
+        if (window.doNextRound) window.doNextRound();
+        else if (window.doRestart) window.doRestart();
         else if (window.makeGameMove) window.makeGameMove({ type: 'restart' });
         return;
       }
@@ -1091,6 +1289,33 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
       }
       return;
     }
+    // 换三张：点击手牌选中/取消（轮到自己时才能选）
+    if (_state && _state.phase === 'swap' && _state.currentPlayer === me) {
+      if (!_layout.length) return;
+      var idx = hitTile(x, y);
+      if (idx < 0) return;
+      var hand = _state.hands[me];
+      var tile = hand[idx];
+      if (!tile) return;
+      if (!_swapSelected) _swapSelected = [];
+      var existIdx = _swapSelected.indexOf(tile.id);
+      if (existIdx >= 0) {
+        _swapSelected.splice(existIdx, 1);
+      } else {
+        if (_swapSelected.length >= 3) return;
+        // 必须同花色（字牌不能换）
+        if (tile.k === 'feng' || tile.k === 'jian') return;
+        if (_swapSelected.length > 0) {
+          var first = hand.find(function(t) { return t.id === _swapSelected[0]; });
+          if (first && first.k !== tile.k) return;
+        }
+        _swapSelected.push(tile.id);
+      }
+      drawControls();
+      draw();
+      return;
+    }
+
     if (!_layout.length) return;
     var idx = hitTile(x, y);
     if (idx < 0) return;
@@ -1109,8 +1334,10 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
   // ---- 积分面板（Canvas 结算界面，phase === 'over' 时绘制）----
   function drawScorePanel() {
     if (!_state || _state.phase !== 'over') return;
+    var hasBuy = Array.isArray(_state.buyTiles) && _state.buyTiles.length > 0;
+    var playerCount = _state.hands.length;
     var panelW = Math.min(380, W - 40);
-    var panelH = 340;
+    var panelH = (playerCount > 0 ? 100 + playerCount * 36 : 340) + (hasBuy ? 60 : 0) + 100;
     var px = (W - panelW) / 2;
     var py = (H - panelH) / 2;
 
@@ -1141,18 +1368,52 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     // 玩家列表
     var cumScore = _state.cumulativeScore || [0,0,0,0];
     var dealerIdx = _state.dealerIndex || 0;
+    // 赢家：四川用 winners 数组（血战可多人胡）；广东用 winner 单值（-1 = 荒庄）
+    var winnerList = Array.isArray(_state.winners) ? _state.winners
+      : (typeof _state.winner === 'number' && _state.winner >= 0 ? [_state.winner] : []);
     ctx.font = '14px system-ui,"Microsoft YaHei",sans-serif';
+    var roundScores = _state.roundScores;
     for (var i = 0; i < _state.hands.length; i++) {
       var yy = py + 72 + i * 36;
       var isDealer = (i === dealerIdx);
-      var isWinner = (_state.winners || []).includes(i);
+      var isWinner = winnerList.indexOf(i) >= 0;
       ctx.fillStyle = isWinner ? '#e05050' : (isDealer ? '#c8a45c' : 'rgba(255,255,255,.85)');
       ctx.textAlign = 'left';
       var label = t('mj_player', '玩家') + (i + 1) + (isDealer ? t('mj_dealer', ' (庄)') : '') + (i === _playerIndex ? t('mj_you', ' (你)') : '');
       if (isWinner) label += t('mj_hu', ' 胡!');
       ctx.fillText(label, px + 20, yy);
+      // 累计分
       ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
       ctx.fillText(cumScore[i] + t('mj_score', '分'), px + panelW - 20, yy);
+      // 本局变动（紧贴累计分左侧）
+      if (roundScores && typeof roundScores[i] === 'number' && roundScores[i] !== 0) {
+        var delta = roundScores[i];
+        var deltaText = (delta > 0 ? '+' : '') + Math.round(delta * 10) / 10;
+        ctx.fillStyle = delta > 0 ? '#51cf66' : '#ff6b6b';
+        ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
+        ctx.fillText(deltaText, px + panelW - 70, yy);
+        ctx.font = '14px system-ui,"Microsoft YaHei",sans-serif';
+      }
+    }
+
+    // 买马（广东）：胡牌后从牌尾买的牌 + 加番
+    var buyTiles = _state.buyTiles;
+    if (Array.isArray(buyTiles) && buyTiles.length > 0) {
+      var byY = py + 72 + _state.hands.length * 36 + 8;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255,255,255,.65)';
+      ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
+      var buyFan = _state.buyFan || 0;
+      ctx.fillText(t('mj_buy_prefix', '买码: ') + buyTiles.length + t('mj_tiles', '张')
+        + (buyFan > 0 ? '  +' + buyFan + t('mj_fan_unit', '番') : ''), W / 2, byY);
+      // 买到的牌面
+      var btw = 26, bth = 34, bgap = 5;
+      var btotal = buyTiles.length * (btw + bgap) - bgap;
+      var bsx = W / 2 - btotal / 2;
+      for (var b = 0; b < buyTiles.length; b++) {
+        drawTileFace(bsx + b * (btw + bgap), byY + 8, btw, bth, buyTiles[b], 0);
+      }
     }
 
     // 下一局按钮（主）
@@ -1187,6 +1448,8 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
   };
   window._mjPung = function() { if (window.makeGameMove) window.makeGameMove({ type: 'pung' }); };
   window._mjKong = function() { if (window.makeGameMove) window.makeGameMove({ type: 'kong' }); };
+  window._mjSelfKong = function(suit, num) { if (window.makeGameMove) window.makeGameMove({ type: 'selfkong', suit: suit, num: num }); };
+  window._mjAddKong = function(suit, num) { if (window.makeGameMove) window.makeGameMove({ type: 'addkong', suit: suit, num: num }); };
   window._mjWin = function() { if (window.makeGameMove) window.makeGameMove({ type: 'win' }); };
   window._mjPass = function() { if (window.makeGameMove) window.makeGameMove({ type: 'pass' }); };
   window._mjChow = function() {

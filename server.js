@@ -409,6 +409,7 @@ function endOfRound(room) {
   if (state.phase !== 'over') return;
   state._roundEndBroadcast = true;
 
+  var gameMod = gameRegistry[room.game];
   var playerCount = state.hands.length;
   var roundScores = new Array(playerCount).fill(0);
 

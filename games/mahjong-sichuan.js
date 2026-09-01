@@ -223,6 +223,11 @@ function finishMultiWinnerClaim(state, playerCount) {
   // 移除被胡的弃牌（只移除一张，即使多家胡）
   removeDiscard(state, state._lastDiscardFrom, state.lastDiscard ? state.lastDiscard.id : null);
   state._multiWinClaimants = [];
+  // 3 家已胡 → 游戏结束，无需再推进（否则 advanceTurn 在 claim 阶段死循环）
+  if (state.winners.length >= 3) {
+    state.phase = 'over';
+    return;
+  }
   // 推进：血战模式继续，非血战则已结束（registerWin 已设 over）
   if (state.phase === 'claim') {
     if (state.winners.length > 0 && state.deck.length === 0) {
@@ -237,7 +242,21 @@ function registerWin(state, playerIndex) {
   if (!state.winners.includes(playerIndex)) state.winners.push(playerIndex);
   // 一炮多响模式：不立即推进，等所有玩家响应完毕
   if (state._multiWinner) {
-    // 仅记录赢家，phase 推进由 finishMultiWinnerClaim 处理
+    // 自摸胡：无点炮者，无法进入 claim 等待响应，直接走血战分支推进
+    if (state._winSelfDraw[playerIndex]) {
+      if (!state._bloodBattle) {
+        state.phase = 'over';
+        return;
+      }
+      if (state.winners.length >= 3 || state.deck.length === 0) {
+        state.phase = 'over';
+      } else {
+        state.currentPlayer = playerIndex;
+        advanceTurn(state, state.hands.length);
+      }
+      return;
+    }
+    // 点炮胡：仅记录赢家，phase 推进由 finishMultiWinnerClaim 处理
     // 但如果非血战模式，最后一家胡了就直接结束
     if (!state._bloodBattle) {
       state.phase = 'over';

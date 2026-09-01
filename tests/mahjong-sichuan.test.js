@@ -328,6 +328,81 @@ test('multi-winner: disabled by default', () => {
   assert.equal(s._multiWinner, false, 'multi-winner disabled by default');
 });
 
+test('multi-winner + blood battle: self-draw win advances turn (no deadlock)', () => {
+  // Bug 1 regression: under multiWinner+bloodBattle, a self-draw win has no
+  // discard to claim, so registerWin must advance the turn instead of returning
+  // early and leaving currentPlayer pointing at the already-won player.
+  const s = game.createState();
+  s._options = { mahjongMode: 'sichuan', mj_multiWinner: true, mj_bloodBattle: true };
+  game.initGame(s, 4);
+  assert.equal(s._multiWinner, true, 'multi-winner enabled');
+  dealAllVoid(s, ['tong', 'tong', 'tong', 'tong']); // void tong; winning hand uses wan + tiao only
+  // Player 0: 123wan 456wan 789wan 111tiao + 2tiao pair = 14-tile winning hand
+  s.hands[0] = winningHand();
+  s.phase = 'play';
+  s.currentPlayer = 0;
+  s.drawn = s.hands[0][13].id; // simulate last drawn tile
+  const res = game.handleMove({ type: 'win' }, s, 0);
+  assert.equal(res, null, 'self-draw win should succeed');
+  assert.ok(s.winners.includes(0), 'player 0 should be a winner');
+  // Blood battle continues: turn must advance to next non-winner, never deadlock
+  assert.equal(s.phase, 'play', 'blood battle continues to next player');
+  assert.equal(s.currentPlayer, 1, 'turn advances to next non-winner player');
+  assert.equal(s.hands[1].length, 14, 'next player drew a tile');
+});
+
+test('multi-winner + non-blood-battle: self-draw win ends round', () => {
+  const s = game.createState();
+  s._options = { mahjongMode: 'sichuan', mj_multiWinner: true, mj_bloodBattle: false };
+  game.initGame(s, 4);
+  dealAllVoid(s, ['tong', 'tong', 'tong', 'tong']);
+  s.hands[0] = winningHand();
+  s.phase = 'play';
+  s.currentPlayer = 0;
+  s.drawn = s.hands[0][13].id;
+  const res = game.handleMove({ type: 'win' }, s, 0);
+  assert.equal(res, null, 'self-draw win should succeed');
+  assert.ok(s.winners.includes(0), 'player 0 should be a winner');
+  assert.equal(s.phase, 'over', 'non-blood-battle: single win ends the round');
+});
+
+test('multi-winner: 3 winners ends game immediately (no claim-phase deadlock)', () => {
+  // Bug 2 regression: when 3 of 4 players win from the same discard, the game
+  // must end right away. Before the fix finishMultiWinnerClaim called advanceTurn
+  // with 3 winners, which looped forever (maxSteps exceeded).
+  const s = game.createState();
+  s._options = { mahjongMode: 'sichuan', mj_multiWinner: true, mj_bloodBattle: true };
+  game.initGame(s, 4);
+  dealAllVoid(s, ['tong', 'tong', 'tong', 'tong']);
+  // Player 0 discards a wan:5
+  const discardTile = t('wan', 5, 7001);
+  s.hands[0].push(discardTile);
+  if (s.hands[0].length > 14) s.hands[0].shift();
+  assert.equal(game.handleMove({ type: 'discard', tileId: discardTile.id }, s, 0), null);
+  assert.equal(s.phase, 'claim');
+  // Players 1, 2, 3 all hold 13-tile hands that win with wan:5
+  function winningHandNeeding() {
+    return [
+      t('wan', 1, 8001), t('wan', 2, 8002), t('wan', 3, 8003),
+      t('wan', 4, 8004), t('wan', 5, 8005), t('wan', 6, 8006),
+      t('wan', 7, 8007), t('wan', 8, 8008), t('wan', 9, 8009),
+      t('tiao', 1, 8010), t('tiao', 1, 8011),
+      t('wan', 5, 8012), t('wan', 5, 8013),
+    ];
+  }
+  s.hands[1] = winningHandNeeding();
+  s.hands[2] = winningHandNeeding();
+  s.hands[3] = winningHandNeeding();
+  // All three win from the same discard
+  assert.equal(game.handleMove({ type: 'win' }, s, 1), null);
+  assert.equal(game.handleMove({ type: 'win' }, s, 2), null);
+  assert.equal(game.handleMove({ type: 'win' }, s, 3), null);
+  assert.ok(s.winners.includes(1) && s.winners.includes(2) && s.winners.includes(3),
+    'all three winners recorded');
+  // 3 winners → game must be over, not stuck in claim/play
+  assert.equal(s.phase, 'over', '3 winners should end the game immediately');
+});
+
 // ---- 刮风下雨 (gang scoring) ----
 
 test('rain: 直杠 (kong from discard) scores immediately', () => {

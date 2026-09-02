@@ -1,3 +1,49 @@
+/* 内嵌字体：离线也能加载，全部为 OFL 1.1 开源许可，见 assets/fonts/OFL.txt */
+@font-face {
+  font-family: 'Ma Shan Zheng';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/fonts/ma-shan-zheng.woff2') format('woff2');
+}
+/* 霞鹜文楷：字体单一 500 字重，注册为 400-700 范围，加粗由浏览器合成 */
+@font-face {
+  font-family: 'LXGW WenKai';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('assets/fonts/lxgw-wenkai.woff2') format('woff2');
+}
+/* Nunito（界面西文字母）*/
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/fonts/nunito-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('assets/fonts/nunito-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('assets/fonts/nunito-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('assets/fonts/nunito-800.woff2') format('woff2');
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -347,11 +393,22 @@ button, input { font-family: inherit; font-size: inherit; }
   font-size: 14px; font-weight: 600;
   background: var(--bg); transition: all 0.25s;
   border: 1px solid transparent;
+  min-width: 0; /* 允许收缩，名字超长才能省略号，否则会换行竖排 */
+  white-space: nowrap;
 }
 
 .player-tag-avatar {
   font-size: 16px;
   line-height: 1;
+}
+
+/* 玩家名：单行 + 超长省略，避免竖排撑破布局 */
+.player-tag-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+  min-width: 0;
 }
 
 .player-tag.active {
@@ -595,24 +652,40 @@ button, input { font-family: inherit; font-size: inherit; }
   color: #666;
 }
 
-.waiting-slot-swap {
-  width: 32px; height: 32px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface);
+/* 换座 / 移除 / 踢人：三个小徽标式按钮，状态徽标同尺寸，避免大圆圈占用版面 */
+.waiting-slot-swap,
+.waiting-slot-xbtn {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  padding: 2px 6px;
+  border-radius: 8px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
   flex-shrink: 0;
   transition: background 0.15s, border-color 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
 
+.waiting-slot-swap {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
 .waiting-slot-swap:hover, .waiting-slot-swap:active {
   background: var(--bg);
   border-color: var(--accent);
+}
+
+/* 移除AI / 踢人：统一为红色小字 X（与左侧徽标留出间距,避免和 ⇅ 换位按钮紧挨误触） */
+.waiting-slot-xbtn {
+  margin-left: 6px;
+  border: 1px solid rgba(224,80,80,.28);
+  background: rgba(224,80,80,.06);
+  color: #e05050;
+}
+.waiting-slot-xbtn:hover, .waiting-slot-xbtn:active {
+  background: rgba(224,80,80,.16);
+  border-color: #e05050;
 }
 
 .waiting-actions {

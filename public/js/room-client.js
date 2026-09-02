@@ -291,6 +291,13 @@
           showToast(tf('restart_request_notify', msg.by || 'Player'));
         }
       },
+      // Host removed this player from the room: clear local state and go back to lobby.
+      kicked(msg) {
+        terminalRoomError = true;
+        ['roomId', 'playerIndex', 'game', 'resumeToken'].forEach(function(key) { sessionStorage.removeItem(key); });
+        if (ws) { try { ws.close(); } catch (e) {} }
+        window.location.replace('/?kicked=1');
+      },
       room_update(msg) {
         players = msg.players || players;
         roomPhase = msg.phase || roomPhase;
@@ -538,13 +545,17 @@
         if (player.isHost) tagsHtml += '<span class="waiting-slot-badge host">👑 ' + _t('host') + '</span>';
         if (player.isBot) {
           tagsHtml += '<span class="waiting-slot-badge ai">🤖 AI</span>';
-          if (isHost) tagsHtml += '<button class="waiting-slot-remove-bot" data-bot-index="' + i + '" title="' + _t('remove_bot') + '" style="background:none;border:none;color:#e74c3c;font-size:14px;cursor:pointer;padding:0 4px;line-height:1;">✕</button>';
+          if (isHost) tagsHtml += '<button class="waiting-slot-xbtn" data-bot-index="' + i + '" title="' + _t('remove_bot') + '">✕</button>';
         } else if (disconnected) {
           tagsHtml += '<span class="waiting-slot-badge" style="background:#fff3e0;color:#e67e22">📱 ' + _t('in_lobby') + '</span>';
         } else if (player.ready) {
           tagsHtml += '<span class="waiting-slot-badge ready">✓ ' + _t('ready_status') + '</span>';
         } else {
           tagsHtml += '<span class="waiting-slot-badge">' + _t('not_ready') + '</span>';
+        }
+        // 房主可移出真人玩家（不能踢自己/房主）
+        if (isHost && !player.isBot && !player.isHost) {
+          tagsHtml += '<button class="waiting-slot-xbtn" data-kick-index="' + i + '" title="' + _t('kick_player') + '">✕</button>';
         }
         html +=
           '<div class="waiting-slot occupied' + meClass + '">' +
@@ -569,20 +580,32 @@
     }
     slots.innerHTML = html;
 
-    // Attach swap handlers
+    // Attach swap handlers — 一键直换：把该座位与下一位（顺时针）对调，不弹选择框
     slots.querySelectorAll('.waiting-slot-swap').forEach(btn => {
       btn.addEventListener('click', function() {
         const from = parseInt(this.dataset.from, 10);
-        openSeatSwapModal(from, maxSlots);
+        const to = (from + 1) % maxSlots;
+        if (to === from) return;
+        send('swap_seat', { fromIndex: from, toIndex: to });
       });
     });
 
-    // Attach remove-bot handlers (host only)
-    slots.querySelectorAll('.waiting-slot-remove-bot').forEach(btn => {
+    // Attach remove-bot / kick handlers (host only) — 按钮统一为 .waiting-slot-xbtn,用 data 属性区分
+    // 破坏性操作必须确认,避免在 ⇅ 换位按钮旁边误触 ✕ 造成"电脑消失"
+    slots.querySelectorAll('.waiting-slot-xbtn[data-bot-index]').forEach(btn => {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
+        if (!window.confirm(_t('confirm_remove_bot'))) return;
         const botIndex = parseInt(this.dataset.botIndex, 10);
         send('remove_bot', { botIndex });
+      });
+    });
+    slots.querySelectorAll('.waiting-slot-xbtn[data-kick-index]').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (!window.confirm(_t('confirm_kick_player'))) return;
+        const kickIndex = parseInt(this.dataset.kickIndex, 10);
+        send('kick_player', { playerIndex: kickIndex });
       });
     });
 
@@ -916,6 +939,7 @@
             '</div>' : mjMode === 'cantonese' ? '<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.8;">' +
               '<div style="font-weight:600;margin-bottom:2px;">' + _t('mj_rules_cantonese') + '</div>' +
               _t('mj_rule_buyTiles') + ': ' + onOff('mj_buyTiles') + '<br>' +
+              _t('mj_rule_wildcard') + ': ' + onOff('mj_wildcard') + '<br>' +
               _t('mj_rule_maxFan') + ': ' + maxFanLabel(roomOptions.mj_maxFan) + '<br>' +
               _t('mj_rule_minFan') + ': ' + (roomOptions.mj_minFan ? tf('mj_fan_n', roomOptions.mj_minFan) : _t('mj_fan_chicken')) +
             '</div>' : '');

@@ -101,7 +101,8 @@ exports.initGame = function (state, playerCount) {
   state._buyTiles = opt.mj_buyTiles !== false; // default true
   state._maxFan = opt.mj_maxFan || 0; // 0 = no cap
   state._minFan = opt.mj_minFan || 0; // 0 = no minimum
-  state._wildcard = opt.mj_wildcard === true; // 红中百搭（默认关闭）
+  // 红中百搭（默认关闭）。兼容布尔 true 和字符串 'true'（checkbox 值可能被序列化为字符串）
+  state._wildcard = opt.mj_wildcard === true || opt.mj_wildcard === 'true';
   // Server writes the next dealer into state.dealerIndex before initGame. Use it
   // to extend the deal and set the starting player; fall back to 0 for round 1.
   const dealer = state.dealerIndex || 0;
@@ -541,5 +542,6 @@ exports.playerView = function (state, playerIndex) {
     _buyTiles: state._buyTiles,
     _maxFan: state._maxFan,
     _minFan: state._minFan,
+    _wildcard: state._wildcard === true,
   };
 };

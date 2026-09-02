@@ -269,48 +269,6 @@ app.post('/api/debug/room/:roomId/forceWin', express.json(), (req, res) => {
   } catch(e){ return res.json({ error: e.message, stack: e.stack }); }
 });
 
-// Debug: next round (proper game_restart preserving cumulativeScore)
-app.post('/api/debug/room/:roomId/nextRound', express.json(), (req, res) => {
-  const room = rooms.get(req.params.roomId);
-  if (!room) return res.json({ error: 'room not found' });
-  const gameMod = gameRegistry[room.game];
-  if (!gameMod) return res.json({ error: 'no gameMod' });
-  const totalPlayers = room.players.size + (room.bots ? room.bots.size : 0);
-  var prevMJ = null;
-  if (room.state && (room.game === 'mahjong-sichuan' || room.game === 'mahjong-cantonese')) {
-    prevMJ = {
-      cumulativeScore: room.state.cumulativeScore,
-      dealerIndex: room.state.dealerIndex,
-      roundNumber: room.state.roundNumber,
-      winners: room.state.winners,
-      winner: room.state.winner,
-    };
-  }
-  room.state = gameMod.createState();
-  applyRuntimeState(room, totalPlayers);
-  if (gameMod && gameMod.initGame) gameMod.initGame(room.state, totalPlayers);
-  if (prevMJ) {
-    room.state.cumulativeScore = prevMJ.cumulativeScore || new Array(totalPlayers).fill(0);
-    var nextDealer;
-    var hadWinner = false;
-    if (prevMJ.winners && prevMJ.winners.length > 0 && prevMJ.winners[0] >= 0) {
-      nextDealer = prevMJ.winners[0];
-      hadWinner = true;
-    } else if (prevMJ.winner != null && prevMJ.winner >= 0) {
-      nextDealer = prevMJ.winner;
-      hadWinner = true;
-    }
-    if (!hadWinner) {
-      nextDealer = ((prevMJ.dealerIndex || 0) + 1) % totalPlayers;
-    }
-    room.state.dealerIndex = nextDealer;
-    room.state.roundNumber = (prevMJ.roundNumber || 1) + 1;
-  }
-  broadcastGameView(room);
-  broadcastRoom(room, { type: 'game_restart', state: room.state });
-  return res.json({ ok:true, phase: room.state.phase, cumulativeScore: room.state.cumulativeScore, roundNumber: room.state.roundNumber, dealerIndex: room.state.dealerIndex });
-});
-
 logStep('[android-node] server.js init http/ws server');
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -585,18 +543,30 @@ function endOfRound(room) {
     }
   }
 
-  if (!state.cumulativeScore) state.cumulativeScore = new Array(playerCount).fill(0);
-  for (var i = 0; i < playerCount; i++) {
-    state.cumulativeScore[i] = (state.cumulativeScore[i] || 0) + roundScores[i];
-    // 刮风下雨：杠收入累加到累计分 + 本局变动
-    if (state._rain && state._gangScore && state._gangScore[i]) {
-      state.cumulativeScore[i] += state._gangScore[i];
-      roundScores[i] += state._gangScore[i];
+  try {
+    if (!state.cumulativeScore) state.cumulativeScore = new Array(playerCount).fill(0);
+    for (var i = 0; i < playerCount; i++) {
+      state.cumulativeScore[i] = (state.cumulativeScore[i] || 0) + roundScores[i];
     }
-    // 流局罚分累加 + 本局变动
-    if (state._penalties && state._penalties[i]) {
-      state.cumulativeScore[i] += state._penalties[i];
-      roundScores[i] += state._penalties[i];
+  } catch(e) {
+    console.error('[endOfRound] ERROR:', e.message);
+  }
+  // 刮风下雨：杠收入累加到累计分 + 本局变动
+  if (state._rain && state._gangScore && state._gangScore) {
+    for (var i2 = 0; i2 < playerCount; i2++) {
+      if (state._gangScore[i2]) {
+        state.cumulativeScore[i2] += state._gangScore[i2];
+        roundScores[i2] += state._gangScore[i2];
+      }
+    }
+  }
+  // 流局罚分累加 + 本局变动
+  if (state._penalties) {
+    for (var i3 = 0; i3 < playerCount; i3++) {
+      if (state._penalties[i3]) {
+        state.cumulativeScore[i3] += state._penalties[i3];
+        roundScores[i3] += state._penalties[i3];
+      }
     }
   }
 
@@ -970,16 +940,48 @@ wss.on('connection', (ws) => {
         return;
       }
       const { botIndex } = data || {};
-      if (typeof botIndex === 'number' && currentRoom.bots) {
+      if (typeof botIndex === 'number' && currentRoom.bots.has(botIndex)) {
+        // 只删除,不重排:Map key 就是座位号(真人也占着这些号码),
+        // 重排到 0..n-1 会与真人座位编号相撞,导致客户端按索引显示时"电脑消失"。
         currentRoom.bots.delete(botIndex);
-        // Re-index remaining bots so names stay sequential.
-        const entries = [...currentRoom.bots.entries()].sort((a, b) => a[0] - b[0]);
-        currentRoom.bots.clear();
-        entries.forEach(([, bot], i) => {
-          bot.index = i;
-          bot.name = currentRoom._lang === 'zh' ? '电脑' + (i + 1) : 'Bot ' + (i + 1);
-          currentRoom.bots.set(i, bot);
-        });
+      }
+      broadcastRoom(currentRoom, {
+        type: 'room_update',
+        phase: currentRoom.phase,
+        players: roomPlayersList(currentRoom),
+      });
+      return;
+    }
+
+    // --- kick_player (host removes a human player from the room) ---
+    if (type === 'kick_player') {
+      if (!currentRoom) return;
+      if (ws !== currentRoom.hostWS) {
+        ws.send(JSON.stringify({ type: 'error', message: serverT(currentRoom, 'host_only_kick') }));
+        return;
+      }
+      if (currentRoom.phase === 'playing') {
+        ws.send(JSON.stringify({ type: 'error', message: serverT(currentRoom, 'kick_disallowed_playing') }));
+        return;
+      }
+      const { playerIndex } = data || {};
+      if (typeof playerIndex !== 'number') return;
+      let targetWS = null, targetInfo = null;
+      for (const [w, info] of currentRoom.players) {
+        if (info.index === playerIndex) { targetWS = w; targetInfo = info; break; }
+      }
+      if (!targetInfo) return; // 不是真人（bot 由 remove_bot 处理）
+      // 房主不能踢自己
+      let hostIndex = -1;
+      for (const [w, info] of currentRoom.players) {
+        if (w === currentRoom.hostWS) { hostIndex = info.index; break; }
+      }
+      if (targetInfo.index === hostIndex) return;
+      currentRoom.players.delete(targetWS);
+      currentRoom.readyPlayers.delete(playerIndex);
+      if (targetWS.readyState === 1) {
+        targetWS.send(JSON.stringify({ type: 'kicked', reason: serverT(currentRoom, 'kicked_by_host') }));
+        setTimeout(() => { try { targetWS.close(); } catch (e) {} }, 120);
       }
       broadcastRoom(currentRoom, {
         type: 'room_update',
@@ -1156,6 +1158,10 @@ wss.on('connection', (ws) => {
 
       currentRoom.phase = 'playing';
       applyRuntimeState(currentRoom, totalPlayers);
+      // 麻将首局随机坐庄：不让房主默认当庄先摸牌先出牌
+      if (currentRoom.game === 'mahjong-sichuan' || currentRoom.game === 'mahjong-cantonese') {
+        currentRoom.state.dealerIndex = Math.floor(Math.random() * totalPlayers);
+      }
       if (gameMod && gameMod.initGame) {
         gameMod.initGame(currentRoom.state, totalPlayers);
       }
@@ -1187,14 +1193,21 @@ wss.on('connection', (ws) => {
       if (fromPlayer) currentRoom.players.get(fromPlayer[0]).index = toIndex;
       if (toPlayer) currentRoom.players.get(toPlayer[0]).index = fromIndex;
 
-      // Swap bot indices
+      // Swap bot indices —— 两个 bot 相邻对换时,顺序 delete/set 会把刚放好的那个删掉,
+      // 直接把两个 key 值互换;单边有 bot 时移动,无 bot 则不动作。
       if (currentRoom.bots) {
         const fromBot = currentRoom.bots.get(fromIndex);
         const toBot = currentRoom.bots.get(toIndex);
-        if (fromBot) { currentRoom.bots.delete(fromIndex); currentRoom.bots.set(toIndex, fromBot); }
-        else { currentRoom.bots.delete(toIndex); }
-        if (toBot) { currentRoom.bots.delete(toIndex); currentRoom.bots.set(fromIndex, toBot); }
-        else { currentRoom.bots.delete(fromIndex); }
+        if (fromBot && toBot) {
+          currentRoom.bots.set(toIndex, fromBot);
+          currentRoom.bots.set(fromIndex, toBot);
+        } else if (fromBot) {
+          currentRoom.bots.delete(fromIndex);
+          currentRoom.bots.set(toIndex, fromBot);
+        } else if (toBot) {
+          currentRoom.bots.delete(toIndex);
+          currentRoom.bots.set(fromIndex, toBot);
+        }
       }
 
       // Swap ready states
@@ -1291,53 +1304,10 @@ wss.on('connection', (ws) => {
       const playerInfo = currentRoom.players.get(ws);
       if (!playerInfo) return;
 
-      // --- Generic event logging: capture key state transitions for debugging ---
-      const _prevPhase = currentRoom.state.phase;
-      const _prevWinners = (currentRoom.state.winners && currentRoom.state.winners.slice()) || [];
-      const _prevCP = currentRoom.state.currentPlayer;
-      const _prevMeldCount = currentRoom.state.melds
-        ? currentRoom.state.melds.reduce((s, m) => s + (m ? m.length : 0), 0)
-        : 0;
-
       const err = gameMod.handleMove(data, currentRoom.state, playerInfo.index);
       if (err) {
         ws.send(JSON.stringify({ type: 'error', message: serverT(currentRoom, err), code: err }));
         return;
-      }
-
-      const _st = currentRoom.state;
-      // 1) Phase change (any game)
-      if (_st.phase !== _prevPhase) {
-        console.log('[game-event] room=' + currentRoom._roomId + ' game=' + currentRoom.game +
-          ' phase: ' + _prevPhase + ' → ' + _st.phase +
-          ' | by player=' + playerInfo.index + ' move=' + data.type);
-      }
-      // 2) Winner(s) added (mahjong blood-battle, etc.)
-      const _newWinners = _st.winners || [];
-      if (_newWinners.length > _prevWinners.length) {
-        const _w = _newWinners[_newWinners.length - 1];
-        let _score = null;
-        try { if (gameMod.calculateScore) _score = gameMod.calculateScore(_st, _w); } catch (e) {}
-        console.log('[game-event] room=' + currentRoom._roomId + ' game=' + currentRoom.game +
-          ' WINNER player=' + _w +
-          ' | selfDraw=' + !!(_st._winSelfDraw && _st._winSelfDraw[_w]) +
-          ' | fan=' + (_score ? _score.fan : 'n/a') +
-          ' | details=' + (_score ? JSON.stringify(_score.details) : '-') +
-          ' | totalWinners=' + _newWinners.length);
-      }
-      // 3) Round / game over
-      if (_st.phase === 'over' && _prevPhase !== 'over') {
-        console.log('[game-event] room=' + currentRoom._roomId + ' game=' + currentRoom.game +
-          ' ROUND_OVER | winners=' + JSON.stringify(_newWinners) +
-          ' | cumulativeScore=' + JSON.stringify(_st.cumulativeScore));
-      }
-      // 4) Meld added (pung/kong/chow) — detect via total meld count increase
-      const _newMeldCount = _st.melds
-        ? _st.melds.reduce((s, m) => s + (m ? m.length : 0), 0)
-        : 0;
-      if (_newMeldCount > _prevMeldCount && _prevCP === playerInfo.index) {
-        console.log('[game-event] room=' + currentRoom._roomId + ' game=' + currentRoom.game +
-          ' MELD by player=' + playerInfo.index + ' move=' + data.type);
       }
 
       skipDisconnectedTurn(currentRoom);
@@ -1399,7 +1369,6 @@ wss.on('connection', (ws) => {
           winner: currentRoom.state.winner,
         };
       }
-
       currentRoom.state = gameMod.createState();
       applyRuntimeState(currentRoom, totalPlayers);
 

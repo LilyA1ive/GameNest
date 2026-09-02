@@ -121,12 +121,20 @@ function switchToCantonese(state, playerCount) {
   const realPlayerCount = state._realPlayerCount;
   const hasBots = state._hasBots;
   const lang = state._lang;
+  // 多局累计字段：server 在 game_restart 时先于 initGame 写回 cumulativeScore/
+  // dealerIndex/roundNumber，若这里一并清空就白写了。必须保留到 initGame 之后。
+  const cumulativeScore = state.cumulativeScore;
+  const dealerIndex = state.dealerIndex;
+  const roundNumber = state.roundNumber;
   for (const k in state) delete state[k];
   Object.assign(state, cantonese.createState());
   if (options !== undefined) state._options = options;
   if (realPlayerCount !== undefined) state._realPlayerCount = realPlayerCount;
   if (hasBots !== undefined) state._hasBots = hasBots;
   if (lang !== undefined) state._lang = lang;
+  if (cumulativeScore) state.cumulativeScore = cumulativeScore;
+  if (dealerIndex !== undefined) state.dealerIndex = dealerIndex;
+  if (roundNumber) state.roundNumber = roundNumber;
   cantonese.initGame(state, playerCount);
   state._variants = 'cantonese';
 }

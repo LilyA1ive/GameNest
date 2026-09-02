@@ -80,6 +80,13 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
           '</div>';
         canvas = document.getElementById('mjCanvas');
         ctx = canvas.getContext('2d');
+        // 强制拉取牌面字体（canvas 不触发懒加载），字体就绪后重绘一帧，
+        // 避免开牌瞬间字牌/万条用回退字体渲染
+        if (document.fonts && document.fonts.load) {
+          try {
+            document.fonts.load('32px "Ma Shan Zheng"').then(function() { draw(); }).catch(function() {});
+          } catch (e) {}
+        }
         // 手机端：允许 mjBoard 上下滚动（手牌多行时）
         if (window.innerWidth < 500) {
           var board = document.getElementById('mjBoard');
@@ -120,7 +127,10 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
             _prevHandSize = curSize;
             var oldH = H;
             sizeCanvas();
-            if (H !== oldH) { draw(); return; }
+            // 高度变化只重绘画布不够：定缺/claim 等阶段的按钮在 drawControls 里，
+            // 若这里直接 return，首局（_prevHandSize 0→13）会跳过 drawControls，
+            // 导致手机端定缺按钮永不出现。必须重绘控件。
+            if (H !== oldH) { draw(); drawControls(); return; }
           }
           _prevHandSize = curSize;
         }
@@ -344,7 +354,7 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
 
     if (isHonour) {
       var name = HONOUR[tile.k] && HONOUR[tile.k][tile.n] || '';
-      ctx.font = 'bold ' + Math.floor(h * 0.44) + 'px "Ma Shan Zheng","KaiTi","Microsoft YaHei",serif';
+      ctx.font = 'bold ' + Math.floor(h * 0.44) + 'px "Ma Shan Zheng","LXGW WenKai","KaiTi","Microsoft YaHei",serif';
       ctx.fillText(name, x + w / 2, y + h / 2 + 1);
       // 番子右上角小红点（中/发）
       if (tile.k === 'jian' && (tile.n === 1 || tile.n === 2)) {
@@ -354,18 +364,10 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
         ctx.fill();
       }
     } else {
-      ctx.font = 'bold ' + Math.floor(h * 0.42) + 'px "Ma Shan Zheng","KaiTi","Microsoft YaHei",serif';
+      ctx.font = 'bold ' + Math.floor(h * 0.42) + 'px "Ma Shan Zheng","LXGW WenKai","KaiTi","Microsoft YaHei",serif';
       ctx.fillText(String(tile.n), x + w / 2, y + h * 0.35);
-      ctx.font = Math.floor(h * 0.26) + 'px "Ma Shan Zheng","KaiTi","Microsoft YaHei",serif';
+      ctx.font = Math.floor(h * 0.26) + 'px "Ma Shan Zheng","LXGW WenKai","KaiTi","Microsoft YaHei",serif';
       ctx.fillText(SUIT_GLYPH[tile.k] || '', x + w / 2, y + h * 0.72);
-    }
-    // 百搭标记：启用红中百搭规则时，红中牌左上角显示小标记
-    if (_state && _state._wildcard && tile.k === 'jian' && tile.n === 1 && w >= 20) {
-      ctx.fillStyle = 'rgba(255,200,40,.85)';
-      ctx.font = 'bold ' + Math.floor(h * 0.18) + 'px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText('W', x + 2, y + 1);
     }
     ctx.restore();
   }
@@ -472,22 +474,23 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
   function drawWallCount() {
     var count = _state.deckCount || (_state.deck && _state.deck.length)
       || (typeof _state.wall === 'number' ? _state.wall : 0) || 0;
-    if (!count) return;
+    var line = t('mj_round_label', '第') + (_state.roundNumber || 1) + t('mj_round_unit', '局');
+    if (_state && _state._wildcard) line += ' · ' + t('mj_rule_wildcard', '红中百搭');
+    if (count) line += ' · ' + t('mj_wall_left', '余牌: ') + count;
     ctx.save();
     ctx.fillStyle = 'rgba(255,255,255,.55)';
     ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    var rn = _state.roundNumber || 1;
-    ctx.fillText(t('mj_round_label', '第') + rn + t('mj_round_unit', '局') + ' · ' + t('mj_wall_left', '余牌: ') + count, W - 12, H - 6);
+    ctx.fillText(line, W - 12, H - 6);
     ctx.restore();
   }
 
   function drawOpponents() {
     var seats = _state.hands.length;
     // 对手牌背：对家横排在顶部；左右家打横、垂直向下延伸（2列多行网格）
-    var _isMobile = W < 500;
-    var oppScale = _isMobile ? 0.38 : 0.5;
+    var _isMobile = W < 500 || H < 500; // 横屏手机画布矮（W>=500）也算小屏；大屏桌机不受影响
+    var oppScale = _isMobile ? 0.28 : 0.5; // 小屏时把对手牌背缩小，避免棋盘被撑高；大屏保持原样
     var tw = Math.round(TW * oppScale), th = Math.round(TH * oppScale);
     var gap = 2;
     var sideCols = 2; // 左右家每行摆 2 张（打横），然后向下延伸
@@ -653,13 +656,18 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
   function drawDiscards() {
     var allTiles = buildDiscardSequence();
     if (allTiles.length === 0) return;
-    var dw = Math.round(TW * 0.52), dh = Math.round(TH * 0.52);
+    var dw = Math.round(TW * (isMobile ? 0.4 : 0.52)), dh = Math.round(TH * (isMobile ? 0.4 : 0.52)); // 小屏缩小弃牌，大屏原样
     var gap = 3;
     var isMobile = W < 500;
     var zoneW = W * (isMobile ? 0.88 : 0.56);
     var zoneH = H * (isMobile ? 0.40 : 0.34);
     var zoneX = (W - zoneW) / 2;
-    var zoneY = (H - zoneH) / 2;
+    // 弃牌区整体上移：手机 +15%（腾出底部手牌空间）；横屏大屏（W>=500）+10%，
+    // 更高会贴到对家牌
+    var zoneY = (H - zoneH) / 2 - (H * (isMobile ? 0.15 : 0.1));
+    // 钳制：顶部永远给对家牌背 + 名牌留出空间，横屏/矮画布下不再压住对家
+    var oppTh = Math.round(TH * (isMobile ? 0.28 : 0.5));
+    zoneY = Math.max(zoneY, 30 + oppTh + 16);
     var perRow = Math.max(6, Math.floor(zoneW / (dw + gap)));
     // 中央网格：按全局时间从左到右、从上到下，新牌始终在末尾
     for (var idx = 0; idx < allTiles.length; idx++) {
@@ -697,7 +705,8 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
   function drawMelds() {
     if (!_state.melds) return;
     var seats = _state.melds.length;
-    var tw = Math.round(TW * 0.36), th = Math.round(TH * 0.36);
+    var _isMobile = W < 500;
+    var tw = Math.round(TW * (_isMobile ? 0.3 : 0.36)), th = Math.round(TH * (_isMobile ? 0.3 : 0.36)); // 小屏缩小明牌，大屏原样
     var gap = 2;
     var groupGap = 8;
     var maxPerRow = 6; // 每行最多 6 张（约 2 组）
@@ -709,7 +718,9 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
       var groups = [];
       for (var m = 0; m < melds.length; m++) {
         var md = melds[m];
-        var cnt = md.tiles ? md.tiles.length : (md.type === 'kong' ? 4 : 3);
+        // 数量按 meld 类型固定（碰/吃=3，杠=4）。四川的 meld 通常只存 0~1 张代表牌
+        //（md.tile），广东存真实牌（md.tiles）；用类型决定张数，绘制时再用 md.tile 补齐。
+        var cnt = md.type === 'kong' ? 4 : 3;
         groups.push({ md: md, count: cnt });
       }
       if (pos === 'bottom') {
@@ -1045,7 +1056,11 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
 
     if (_state.phase === 'claim' && _state.lastDiscard) {
       // 只对当前 claim 响应者显示按钮（非响应者点按钮会被服务端拒绝）
-      var isActor = _state.claim && _state.claim.order && _state.claim.order[_state.claim.idx] === me;
+      // 广东：严格顺序（_state.claim.order），只有当前响应者能操作；
+      // 四川：自由响应（_claimPending 计数、一炮多响），无 _state.claim，
+      //       任何能吃的玩家都能发起碰/杠/胡，不能的操作则自动过。
+      var isActor = (_state.claim && _state.claim.order && _state.claim.order[_state.claim.idx] === me)
+        || !_state.claim;
       var claims = [];
       if (isActor && me !== undefined && !(_state.winners || []).includes(me)) {
         claims = getAvailableClaims();
@@ -1141,22 +1156,45 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
   }
 
   // 简化的胡牌判断（标准型 + 七对），与 games/lib/mahjong-core 一致
+  // 红中百搭感知的胡牌判断（用于前端显示"胡"按钮）
   function huCheckSimple(tiles, melds) {
+    // 分离百搭牌
+    var isWild = _state && _state._wildcard;
+    var wildcards = 0;
     var counts = {};
     for (var i = 0; i < tiles.length; i++) {
-      var key = tiles[i].k + ':' + tiles[i].n;
-      counts[key] = (counts[key] || 0) + 1;
+      if (isWild && tiles[i].k === 'jian' && tiles[i].n === 1) { wildcards++; }
+      else {
+        var key = tiles[i].k + ':' + tiles[i].n;
+        counts[key] = (counts[key] || 0) + 1;
+      }
     }
     var exposedMelds = melds ? melds.length : 0;
     var keys = Object.keys(counts);
+    // 对子 + 面子（含百搭辅助）
     for (var pi = 0; pi < keys.length; pi++) {
       if (counts[keys[pi]] >= 2) {
         var tc = Object.assign({}, counts);
         tc[keys[pi]] -= 2;
         if (tc[keys[pi]] === 0) delete tc[keys[pi]];
-        if (canFormMelds(tc)) return true;
+        if (canFormMeldsWild(tc, wildcards)) return true;
       }
     }
+    // 百搭做雀头：1张普通牌 + 1百搭，或2百搭
+    if (wildcards >= 1) {
+      for (var pw = 0; pw < keys.length; pw++) {
+        if (counts[keys[pw]] >= 1) {
+          var tc2 = Object.assign({}, counts);
+          tc2[keys[pw]] -= 1;
+          if (tc2[keys[pw]] === 0) delete tc2[keys[pw]];
+          if (canFormMeldsWild(tc2, wildcards - 1)) return true;
+        }
+      }
+    }
+    if (wildcards >= 2) {
+      if (canFormMeldsWild(counts, wildcards - 2)) return true;
+    }
+    // 七对（无副露时）
     if (exposedMelds === 0 && tiles.length === 14) {
       if (keys.length === 7) {
         var allPairs = true;
@@ -1190,6 +1228,50 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
         if (next2[k2] === 0) delete next2[k2];
         if (next2[k3] === 0) delete next2[k3];
         if (canFormMelds(next2)) return true;
+      }
+    }
+    return false;
+  }
+
+  // 百搭面子递归（与 games/lib/mahjong-core 的 canFormMeldsWild 一致）
+  function canFormMeldsWild(counts, wildcards) {
+    var keys = Object.keys(counts).filter(function(k){return counts[k]>0;});
+    if (keys.length === 0) return true;
+    var key = keys[0];
+    var parts = key.split(':');
+    var k = parts[0], n = parseInt(parts[1]);
+    var cnt = counts[key];
+    // 刻子
+    if (cnt >= 3) {
+      var next = Object.assign({}, counts);
+      next[key] -= 3;
+      if (next[key] === 0) delete next[key];
+      if (canFormMeldsWild(next, wildcards)) return true;
+    }
+    var wildForPung = Math.max(0, 3 - cnt);
+    if (wildForPung > 0 && wildForPung <= wildcards) {
+      var next2 = Object.assign({}, counts);
+      delete next2[key];
+      if (canFormMeldsWild(next2, wildcards - wildForPung)) return true;
+    }
+    // 顺子（仅数牌）
+    if (k !== 'feng' && k !== 'jian' && n <= 7) {
+      var k2 = k + ':' + (n+1), k3 = k + ':' + (n+2);
+      var has2 = counts[k2] || 0, has3 = counts[k3] || 0;
+      if (has2 > 0 && has3 > 0) {
+        var next3 = Object.assign({}, counts);
+        next3[key]--; if (next3[key] === 0) delete next3[key];
+        next3[k2]--; if (next3[k2] === 0) delete next3[k2];
+        next3[k3]--; if (next3[k3] === 0) delete next3[k3];
+        if (canFormMeldsWild(next3, wildcards)) return true;
+      }
+      var need = (has2 > 0 ? 0 : 1) + (has3 > 0 ? 0 : 1);
+      if (need > 0 && need <= wildcards) {
+        var next4 = Object.assign({}, counts);
+        next4[key]--; if (next4[key] === 0) delete next4[key];
+        if (has2 > 0) { next4[k2]--; if (next4[k2] === 0) delete next4[k2]; }
+        if (has3 > 0) { next4[k3]--; if (next4[k3] === 0) delete next4[k3]; }
+        if (canFormMeldsWild(next4, wildcards - need)) return true;
       }
     }
     return false;
@@ -1345,7 +1427,8 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     var hasBuy = Array.isArray(_state.buyTiles) && _state.buyTiles.length > 0;
     var playerCount = _state.hands.length;
     var panelW = Math.min(380, W - 40);
-    var panelH = (playerCount > 0 ? 100 + playerCount * 36 : 340) + (hasBuy ? 60 : 0) + 100;
+    // 多出 28px 留给结果状态条（胡/未胡/平局）
+    var panelH = (playerCount > 0 ? 128 + playerCount * 36 : 368) + (hasBuy ? 60 : 0) + 100;
     var px = (W - panelW) / 2;
     var py = (H - panelH) / 2;
 
@@ -1373,16 +1456,24 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
     ctx.fillText(t('mj_round_label', '第') + rn + t('mj_round_unit', '局'), W / 2, py + 56);
 
-    // 玩家列表
-    var cumScore = _state.cumulativeScore || [0,0,0,0];
-    var dealerIdx = _state.dealerIndex || 0;
     // 赢家：四川用 winners 数组（血战可多人胡）；广东用 winner 单值（-1 = 荒庄）
     var winnerList = Array.isArray(_state.winners) ? _state.winners
       : (typeof _state.winner === 'number' && _state.winner >= 0 ? [_state.winner] : []);
+    // 结果状态条：胡 / 未胡 / 平局（流局）
+    var iWon = winnerList.indexOf(_playerIndex) >= 0;
+    var resultText = winnerList.length === 0 ? t('mj_result_draw', '流局 · 平局')
+      : (iWon ? t('mj_result_win', '你胡了！') : t('mj_result_lose', '本局未胡'));
+    ctx.fillStyle = iWon ? '#e05050' : 'rgba(255,255,255,.72)';
+    ctx.font = 'bold 14px system-ui,"Microsoft YaHei",sans-serif';
+    ctx.fillText(resultText, W / 2, py + 78);
+
+    // 玩家列表
+    var cumScore = _state.cumulativeScore || [0,0,0,0];
+    var dealerIdx = _state.dealerIndex || 0;
     ctx.font = '14px system-ui,"Microsoft YaHei",sans-serif';
     var roundScores = _state.roundScores;
     for (var i = 0; i < _state.hands.length; i++) {
-      var yy = py + 72 + i * 36;
+      var yy = py + 100 + i * 36;
       var isDealer = (i === dealerIdx);
       var isWinner = winnerList.indexOf(i) >= 0;
       ctx.fillStyle = isWinner ? '#e05050' : (isDealer ? '#c8a45c' : 'rgba(255,255,255,.85)');
@@ -1408,7 +1499,7 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
     // 买马（广东）：胡牌后从牌尾买的牌 + 加番
     var buyTiles = _state.buyTiles;
     if (Array.isArray(buyTiles) && buyTiles.length > 0) {
-      var byY = py + 72 + _state.hands.length * 36 + 8;
+      var byY = py + 100 + _state.hands.length * 36 + 8;
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(255,255,255,.65)';
       ctx.font = '12px system-ui,"Microsoft YaHei",sans-serif';
@@ -1458,6 +1549,9 @@ var _resizeBound = false;  // 渲染器是单例，init 会跨局重复调用，
   window._mjKong = function() { if (window.makeGameMove) window.makeGameMove({ type: 'kong' }); };
   window._mjSelfKong = function(suit, num) { if (window.makeGameMove) window.makeGameMove({ type: 'selfkong', suit: suit, num: num }); };
   window._mjAddKong = function(suit, num) { if (window.makeGameMove) window.makeGameMove({ type: 'addkong', suit: suit, num: num }); };
+  // 调试用：暴露内部状态到全局（便于 F12 Console 排查）
+  window._mjGetState = function() { return _state; };
+  window._mjGetPlayerIndex = function() { return _playerIndex; };
   window._mjWin = function() { if (window.makeGameMove) window.makeGameMove({ type: 'win' }); };
   window._mjPass = function() { if (window.makeGameMove) window.makeGameMove({ type: 'pass' }); };
   window._mjChow = function() {

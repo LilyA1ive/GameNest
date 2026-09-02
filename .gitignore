@@ -14,6 +14,10 @@ yarn-error.log*
 test-results/
 coverage/
 
+# Ad-hoc server run logs / throwaway test scripts
+tmp-*.log
+tmp-*.js
+
 # Build output
 dist/
 
@@ -106,3 +110,6 @@ public/js/renderers/sanguosha.js
 public/assets/game-covers/sanguosha.webp
 tests/sanguosha*.test.js
 .sanguosha-hidden/
+
+# 开发计划文档（本地保留，不发布）
+docs/plans/

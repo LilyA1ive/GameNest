@@ -47,6 +47,33 @@ test('initGame: supports 2 players', () => {
   assert.equal(s.deck.length + dealt, 108);
 });
 
+// ---- dealer rotation (server writes state.dealerIndex before initGame) ----
+
+test('initGame: dealerIndex rotates the dealer (extra tile + starting player)', () => {
+  const s = game.createState();
+  s.dealerIndex = 2; // server sets the next dealer before initGame
+  game.initGame(s, 4);
+  assert.equal(s.currentPlayer, 2, 'starting player is the dealer');
+  assert.equal(s.hands[2].length, 14, 'dealer holds the extra tile');
+  assert.equal(s.hands[0].length, 13);
+  assert.equal(s.hands[1].length, 13);
+  assert.equal(s.hands[3].length, 13);
+});
+
+test('initGame: dealer rotation persists through the void phase', () => {
+  const s = game.createState();
+  s.dealerIndex = 2;
+  game.initGame(s, 4);
+  assert.equal(s.phase, 'void');
+  assert.equal(s.currentPlayer, 2, 'dealer picks void first');
+  // all players pick void in turn order starting from the dealer
+  for (const i of [2, 3, 0, 1]) {
+    assert.equal(game.handleMove({ type: 'void', suit: 'wan' }, s, i), null);
+  }
+  assert.equal(s.phase, 'play');
+  assert.equal(s.currentPlayer, 2, 'dealer starts play after void');
+});
+
 // ---- void selection ----
 
 test('void: each player picks a suit; when all chosen, dealer plays', () => {

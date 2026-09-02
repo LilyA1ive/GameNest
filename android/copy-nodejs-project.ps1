@@ -57,6 +57,19 @@ if (Test-Path $mainSrc) {
     Write-Host "  Skipping main.js (not found in android/)" -ForegroundColor Yellow
 }
 
+# Drop work-in-progress games that are kept locally but must not ship.
+# They are gitignored, so a plain directory copy would still sweep them into the APK,
+# and the APK is published as a GitHub Release asset.
+$unreleased = Get-ChildItem -Path $dest -Recurse -File -Filter '*sanguosha*' -ErrorAction SilentlyContinue
+if ($unreleased) {
+    Write-Host ""
+    Write-Host "Excluding unreleased game files..."
+    foreach ($f in $unreleased) {
+        Remove-Item -Force $f.FullName
+        Write-Host ("  - " + $f.Name)
+    }
+}
+
 # Prune packages that aren't part of the production dependency closure.
 # The copy above takes node_modules wholesale, which drags in undeclared dev-only
 # packages (puppeteer / chromium-bidi / devtools-protocol / zod ... ~17 MB in the APK).

@@ -1,0 +1,17 @@
+字号内嵌文件与许可（均已获 SIL OFL License 1.1 开源许可，可随应用自由分发）：
+
+1. Ma Shan Zheng 马善政楷书 (ma-shan-zheng.woff2, 2.6 MB)
+   Copyright (C) 2019 Google LLC
+   https://fonts.google.com/specimen/Ma+Shan+Zheng
+
+2. LXGW WenKai 霞鹜文楷 (lxgw-wenkai.woff2, 6.9 MB)
+   Copyright (C) 2020-2022 LXGW / C. Y. Wang
+   https://github.com/lxgw/LxgwWenKai
+
+3. Nunito (nunito-400/600/700/800.woff2)
+   Copyright Nunito Project Authors
+   https://fonts.google.com/specimen/Nunito
+
+SIL Open Font License Version 1.1 full text: https://openfontlicense.org
+
+以上字体随应用内嵌用于离线场景（无网络时界面与牌面仍为设计字体）。

@@ -31,7 +31,7 @@ const { getNextPort, isRecoverablePortError } = require('./startup-port');
 
 const PORT = parseInt(process.env.PORT) || 3000;
 const MAX_PORT_RETRIES = 5;
-const DISCONNECT_GRACE_MS = 30000;
+const DISCONNECT_GRACE_MS = 300000;
 let activePort = PORT;
 
 // Load game registry
@@ -1416,6 +1416,24 @@ wss.on('connection', (ws) => {
       scheduleRealtimeGame(currentRoom);
       scheduleBotMove(currentRoom);
       return;
+    }
+
+    // --- chat（房间自由对话；heat 里跟 Lily 贫嘴那格） ---
+    if (type === 'chat') {
+    if (!currentRoom) return;
+    const info = currentRoom.players.get(ws);
+    if (!info) return;
+    const text = String((data && data.text) || '').slice(0, 300).trim();
+    if (!text) return;
+    // 发给房间里除了发送者以外的所有人（发送者自己客户端已乐观显示，避免重复）
+    sendToRoom(currentRoom, {
+      type: 'chat',
+      playerIndex: info.index,
+      name: info.name,
+      isBot: !!info.isBot,
+      text,
+    }, ws);
+    return;
     }
 
     // --- leave_room (go back to lobby, with grace period for resume) ---

@@ -227,6 +227,14 @@
       room_created(msg) {
         handleRoomJoined(msg);
       },
+      chat(msg) {
+        // 房间自由对话：heat 里跟 Lily 贫嘴那格。
+        // 存原始字段（isBot/name/text/ts），显示由 heat 渲染器判：isBot=Lily，否则=你。
+        if (typeof window.__heatChatLog === 'undefined') window.__heatChatLog = [];
+        window.__heatChatLog.push({ isBot: !!msg.isBot, name: msg.name, text: msg.text, ts: Date.now() });
+        if (window.__heatChatLog.length > 120) window.__heatChatLog.shift();
+        window.dispatchEvent(new CustomEvent('heat:chat', { detail: msg }));
+      },
       game_state(msg) {
         var wasRestart = false;
         if (state && state.winner != null && msg.state &&
@@ -1222,6 +1230,10 @@
 
   window.makeGameMove = function(data) {
     send('game_move', data);
+  };
+
+  window.sendChat = function(text) {
+    send('chat', { text: String(text || '').slice(0, 300) });
   };
 
   var pendingRestart = false; // non-host clicked "play again", waiting for host

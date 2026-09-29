@@ -183,6 +183,35 @@
           .heat-log-you { color: #f0c0c0; }
           .heat-log-me { color: #f0a0a0; }
           .heat-log-sys { text-align: center; font-style: italic; color: #b3402e; }
+          .heat-chat-box {
+            background: #140d0d;
+            border: 1px solid #361717;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 15px;
+          }
+          .heat-chat-title { font-size: 13px; font-weight: bold; color: #b3402e; margin-bottom: 8px; }
+          .heat-chat-log {
+            max-height: 160px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 8px;
+          }
+          .heat-chat-line { margin-bottom: 4px; word-break: break-word; }
+          .heat-chat-line .cnm { font-weight: bold; margin-right: 4px; }
+          .heat-chat-you .cnm { color: #7fb6e8; }
+          .heat-chat-me .cnm { color: #ff8fa0; }
+          .heat-chat-inputrow { display: flex; gap: 6px; }
+          .heat-chat-input {
+            flex: 1; background: #0c0808; border: 1px solid #4a1515; border-radius: 6px;
+            padding: 8px; color: #f2e2e2; font-size: 13px; outline: none;
+          }
+          .heat-chat-send {
+            background: linear-gradient(90deg, #7a1f1f, #b3402e); color: #fff; border: none;
+            border-radius: 6px; padding: 8px 14px; font-size: 13px; font-weight: bold; cursor: pointer;
+          }
+          .heat-chat-send:active { transform: scale(.96); }
           .heat-result-block {
             background: #331111;
             border: 1px dashed #b3402e;
@@ -352,10 +381,57 @@
               <div class="heat-hand-title">情事记录</div>
               <div class="heat-log">${logHtml}</div>
               ${resultHtml}
+              <div class="heat-chat-box">
+                <div class="heat-chat-title">跟 Lily 贫嘴</div>
+                <div class="heat-chat-log" id="heatChatLog"></div>
+                <div class="heat-chat-inputrow">
+                  <input class="heat-chat-input" id="heatChatInput" maxlength="300" placeholder="跟她说一句…" />
+                  <button class="heat-chat-send" id="heatChatSend">发</button>
+                </div>
+              </div>
             </div>
           `;
+
+          // 对话框：渲染器被每次 game_state 重建，chat 内容从 window.__heatChatLog 重建，
+          // 正在打的半截话存 module 变量不丢。
+          heatBindChat(activeSec);
         }
       }
     }
+  });
+
+  var _chatDraft = '';
+  function heatBindChat(sec) {
+    var logEl = sec.querySelector('#heatChatLog');
+    var input = sec.querySelector('#heatChatInput');
+    var send = sec.querySelector('#heatChatSend');
+    if (!logEl || !input || !send) return;
+    input.value = _chatDraft;
+    var lines = (window.__heatChatLog || []);
+    logEl.innerHTML = lines.slice(-40).map(function(l){
+      var isMe = (l.name === 'Lily');
+      var nm = isMe ? 'Lily' : (l.name || '你');
+      return '<div class="heat-chat-line ' + (isMe ? 'heat-chat-me' : 'heat-chat-you') + '"><span class="cnm">' + nm + '：</span>' + escapeHtml(l.text) + '</div>';
+    }).join('');
+    logEl.scrollTop = logEl.scrollHeight;
+    var doSend = function(){
+      var t = input.value.replace(/\s+/g,' ').trim();
+      if (!t) return;
+      input.value = ''; _chatDraft = '';
+      if (window.sendChat) window.sendChat(t);
+      // 乐观更新本地 log，等回显
+      if (typeof window.__heatChatLog === 'undefined') window.__heatChatLog = [];
+      window.__heatChatLog.push({ name: '你', text: t, ts: Date.now() });
+      heatBindChat(sec);
+    };
+    send.onclick = doSend;
+    input.onkeydown = function(e){ if (e.key === 'Enter') doSend(); };
+  }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+
+  window.addEventListener('heat:chat', function(e){
+    // 新 chat 到达 → 刷新当前 play 屏的对话框（不重建整屏）
+    var sec = document.querySelector('.heat-play');
+    if (sec) heatBindChat(sec);
   });
 })();

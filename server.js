@@ -222,6 +222,11 @@ app.post('/api/debug/room/:roomId/forceWin', express.json(), (req, res) => {
   if (!room) return res.json({ error: 'room not found' });
   const state = room.state;
   try {
+    // §6 trimmed build: the mahjong modules may not exist in this build —
+    // guard the requires so the route 404s cleanly instead of crashing the server.
+    if (!fs.existsSync(path.join(__dirname, 'games', 'mahjong-sichuan.js'))) {
+      return res.json({ error: 'mahjong not in this build' });
+    }
     const isCantonese = !!state.wall; // 广东有 wall，四川有 deck/voidSuit
     if (!isCantonese) {
       // 四川必赢：1w2w3w 4w5w6w 7w8w9w 1t1t1t 2t2t (清一色+碰) 缺 tong，非血战一胡即结束以验积分
@@ -917,9 +922,16 @@ wss.on('connection', (ws) => {
         return;
       }
       const bot = botMod.createBot(botIndex);
-      bot.name = currentRoom._lang === 'zh' ? '电脑' + (botIndex + 1) : 'Bot ' + (botIndex + 1);
+      // §2.3: bots that set their own name in createBot (heat → 'Lily') keep it;
+      // generic 电脑N/BotN fallback applies to all other games.
+      if (botMod.name !== 'heat') {
+        bot.name = currentRoom._lang === 'zh' ? '电脑' + (botIndex + 1) : 'Bot ' + (botIndex + 1);
+      }
       if (!currentRoom.bots) currentRoom.bots = new Map();
       currentRoom.bots.set(botIndex, bot);
+      // Bots are always ready: without this, start_game's allReady check stalls
+      // when every seat is a bot (e.g. heat: host + Lily bot).
+      currentRoom.readyPlayers.add(botIndex);
       broadcastRoom(currentRoom, {
         type: 'room_update',
         phase: currentRoom.phase,
